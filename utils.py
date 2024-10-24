@@ -9,6 +9,7 @@ from zabbix_api import (
     get_items,
     generate_graph_url
 )
+
 from datetime import datetime
 import time
 from io import BytesIO
@@ -28,6 +29,17 @@ def download_graph_image(url):
         return BytesIO(response.content)
     else:
         raise Exception("Error al descargar la imagen del gráfico.")
+
+
+
+
+
+severity_mapping = {
+    4: 'High',
+    3: 'Average',
+    2: 'Warning',
+    1: 'Information'
+}
 
 # Procesa la selección de problemas
 async def process_problems(update: Update, context: CallbackContext, *search_terms):
@@ -63,6 +75,7 @@ async def process_problems(update: Update, context: CallbackContext, *search_ter
                        f"Tiempo: {readable_time}")
             await update.callback_query.message.reply_text(message)
 
+
 def download_image(url):
     headers = {
         'Cookie': 'zbx_session=eyJzZXNzaW9uaWQiOiJmNTcxNmQ3YzkxNmNhYjc5YTIxMTczMTM1MzI5MjQzNSIsInNlcnZlckNoZWNrUmVzdWx0Ijp0cnVlLCJzZXJ2ZXJDaGVja1RpbWUiOjE3MjY1OTE1NzUsInNpZ24iOiJjZjEwNzZkMzNkNDgwODQ2NjdkNGJlMjkwMzY5NmUyMmMyZTQxNTk3NzdkYjAzYTAyMGQ3NjFlNmU1MjA0MTliIn0%3D',  # Reemplaza con tu token de sesión
@@ -79,6 +92,8 @@ def download_image(url):
     except requests.RequestException as e:
         raise Exception(f"Error al descargar la imagen: {e}")
 
+
+
 # Muestra las opciones principales
 async def show_primary_options(update: Update, context: CallbackContext):
     keyboard = [
@@ -90,7 +105,9 @@ async def show_primary_options(update: Update, context: CallbackContext):
     if update.callback_query:
         await update.callback_query.message.reply_text("¿Qué deseas consultar Problemas o Graficas?", reply_markup=reply_markup)
 
+
 async def process_graphs(update: Update, context: CallbackContext, *search_terms):
+
     username = context.user_data.get('username')
     password = context.user_data.get('password')
 
@@ -181,4 +198,4 @@ async def process_graphs(update: Update, context: CallbackContext, *search_terms
     await message_target.reply_text("Selecciona una gráfica o ítem para ver:", reply_markup=reply_markup)
 
 
-    # Maneja la selección de una gráfica o ítem y envía la imagen correspondiente
+

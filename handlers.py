@@ -35,6 +35,11 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     )
     return USERNAME
 
+# Manejo del comando /cancel
+async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    await update.message.reply_text("La conversación ha sido cancelada.")
+    return ConversationHandler.END
+
 async def handle_username(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     username = update.message.text
     context.user_data['username'] = username  # Guardar el nombre de usuario
@@ -70,15 +75,17 @@ async def handle_password(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         await update.message.reply_text(f"Error: {str(e)}. Intenta de nuevo.")
         return ConversationHandler.END  # Termina la conversación
 
-async def handle_area_selection(update: Update, context: CallbackContext) -> int:
+async def handle_area_selection(update: Update, context: CallbackContext):
     query = update.callback_query
     area = query.data
 
     context.user_data['area'] = area
 
     if area == 'red':
+        # Realizar acciones para el área "Red"
         await query.message.reply_text("Seleccionaste el área Red")
     elif area == 'fuerza_y_control':
+        # Realizar acciones para el área "Fuerza y control"
         await query.message.reply_text("Seleccionaste el área Fuerza y control")
     else:
         await query.message.reply_text("Área no válida")
@@ -88,43 +95,26 @@ async def handle_area_selection(update: Update, context: CallbackContext) -> int
     await query.message.reply_text("Ingrese el nombre del host que deseas evaluar:")
     return HOST_SELECTION
 
+
 # Maneja la selección del host
 async def handle_host_selection(update: Update, context: CallbackContext):
-    # Verifica si el update viene de un mensaje de texto o de un CallbackQuery
-    if update.message:
-        host_name = update.message.text.strip()  # Obtener y limpiar el texto ingresado
-    else:
-        await update.callback_query.answer("No se recibió texto válido.")
-        return
-
-    auth_token = context.user_data.get('auth_token')
-
-    if not auth_token:
-        await update.message.reply_text("Error: no estás autenticado.")
-        return
-
-    matched_hosts = search_host_by_name(auth_token, host_name)
-
-    if matched_hosts:
-        keyboard = [
-            [InlineKeyboardButton(host['name'], callback_data=f"host_{host['hostid']}")] for host in matched_hosts
-        ]
-        reply_markup = InlineKeyboardMarkup(keyboard)
-        await update.message.reply_text("Hosts encontrados:", reply_markup=reply_markup)
-    else:
-        await update.message.reply_text("No se encontraron hosts que coincidan.")
+    if update.callback_query:
+        query = update.callback_query
+        host_id = query.data
+        context.user_data['host_id'] = host_id
+        await show_primary_options(update, context)
 
 
 # Maneja la selección de las opciones principales
-async def handle_primary_option_selection(update: Update, context: CallbackContext) -> None:
+async def handle_primary_option_selection(update: Update, context: CallbackContext):
     if update.callback_query:
         query = update.callback_query
         option = query.data
         context.user_data['selected_option'] = option
-        await show_secondary_options(update, context)  # Función que debe definir opciones secundarias
+        await show_secondary_options(update, context)
 
 # Maneja la selección de las subcategorías (Interfaces o General)
-async def handle_secondary_option_selection(update: Update, context: CallbackContext) -> None:
+async def handle_secondary_option_selection(update: Update, context: CallbackContext):
     username = context.user_data.get('username')
     password = context.user_data.get('password')
 
@@ -133,7 +123,6 @@ async def handle_secondary_option_selection(update: Update, context: CallbackCon
         secondary_option = query.data
         context.user_data['secondary_option'] = secondary_option
 
-        # Aquí va la lógica específica para manejar opciones según el área
         if context.user_data['area'] == 'red':
             if context.user_data['selected_option'] == 'problems':            
                 if secondary_option == 'interfaces':
@@ -144,7 +133,7 @@ async def handle_secondary_option_selection(update: Update, context: CallbackCon
                     await process_problems(update, context, 'Unavailable by ICMP ping')
             elif context.user_data['selected_option'] == 'graphs':
                 if secondary_option == 'interfaces':
-                    await query.message.reply_text('Por favor, ingresa una palabra clave de la interfaz que deseas ver para optimizar la búsqueda:')
+                    await query.message.reply_text('Por favor, ingresa una palabra clave de lainterfaz que deseas ver para optimizar la busqueda:')
                     return  
                 elif secondary_option == 'general':
                     await query.message.reply_text('Buscando gráficas relacionadas con "ICMP"...')
@@ -163,11 +152,12 @@ async def handle_secondary_option_selection(update: Update, context: CallbackCon
                     await process_problems(update, context, 'temperatura', 'puerta abierta')
             elif context.user_data['selected_option'] == 'graphs':
                 if secondary_option == 'energia':
-                    await query.message.reply_text('Buscando gráficas relacionadas con "Energia"...')
+                    await query.message.reply_text('Buscando problemas relacionados con "Energia"...')
                     await process_graphs(update, context, 'voltaje', 'temperatura', 'corriente', 'ac') 
                 elif secondary_option == 'general':
                     await query.message.reply_text('Buscando gráficas relacionadas con "ICMP"...')
                     await process_graphs(update, context, 'ICMP')
+
 
 # Muestra opciones después de la selección principal
 async def show_secondary_options(update: Update, context: CallbackContext):
@@ -194,7 +184,7 @@ async def show_secondary_options(update: Update, context: CallbackContext):
 
 
 # Maneja la selección de una gráfica o ítem y envía la imagen correspondiente
-async def handle_graph_item_selection(update: Update, context: CallbackContext) -> None:
+async def handle_graph_item_selection(update: Update, context: CallbackContext):
     query = update.callback_query
     data = query.data
 
@@ -216,10 +206,12 @@ async def handle_graph_item_selection(update: Update, context: CallbackContext) 
     # Identifica el tipo de selección
     if data.startswith("graph_"):
         graph_id = data.split("_")[1]
+        # Obtener información de la gráfica
         graph = get_graphs(auth_token, host_id, filter_name=None)
         graph = next((g for g in graph if g['graphid'] == graph_id), None)
 
         if graph:
+            # Determinar el chart_type basado en el nombre de la gráfica
             if "Network traffic" in graph['name']:
                 url = generate_graph_url(graph_id=graph_id, chart_type="chart2.php")
             else:
@@ -234,10 +226,12 @@ async def handle_graph_item_selection(update: Update, context: CallbackContext) 
 
     elif data.startswith("item_"):
         item_id = data.split("_")[1]
+        # Obtener información del ítem
         item = get_items(auth_token, host_id, filter_name=None)
         item = next((i for i in item if i['itemid'] == item_id), None)
 
         if item:
+            # Determinar el chart_type basado en el nombre del ítem
             if "Network Traffic" in item['name']:
                 url = generate_graph_url(item_id=item_id, chart_type="chart2.php")
             else:
@@ -250,4 +244,34 @@ async def handle_graph_item_selection(update: Update, context: CallbackContext) 
         else:
             await query.message.reply_text("No se encontró el ítem seleccionado.")
 
+# Procesa el mensaje de texto para filtrar gráficas por palabra clave
+async def handle_text_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    username = context.user_data.get('username')
+    password = context.user_data.get('password')
+    auth_token = context.user_data.get('auth_token')
 
+    if 'secondary_option' in context.user_data and context.user_data['secondary_option'] == 'interfaces':
+        # Filtrar gráficas por palabra clave
+        keyword = update.message.text
+        await process_graphs(update, context, keyword)
+    else:
+        # auth_token = await zabbix_login(username, password)
+        # if not auth_token:
+        #     await update.message.reply_text("Error en la autenticación de Zabbix.")
+        #     return
+
+        host_name = update.message.text
+        hosts = search_host_by_name(auth_token, host_name)
+
+        if not hosts:
+            await update.message.reply_text("No se encontraron hosts que coincidan con ese nombre.")
+            return
+
+        keyboard = [[InlineKeyboardButton(host['name'], callback_data=host['hostid'])] for host in hosts]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        await update.message.reply_text("Selecciona un host:", reply_markup=reply_markup)
+        context.user_data['host_name'] = host_name
+async def get_host_name(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    host_name = update.message.text
+    context.user_data['host_name'] = host_name  # Almacenar el nombre del host en el contexto
+    await handle_text_message(update, context)  # Llamar a handle_text_message con el host_name

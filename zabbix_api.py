@@ -33,24 +33,14 @@ def search_host_by_name(auth_token, host_name):
         "method": "host.get",
         "params": {
             "output": ["hostid", "name"],
-            "search": {"name": host_name}  # Coincidencia parcial de nombre
+            "search": {"name": host_name}
         },
         "id": 2,
         "auth": auth_token
     }
     headers = {'Content-Type': 'application/json-rpc'}
-    
-    try:
-        response = requests.post(ZABBIX_URL, json=payload, headers=headers)
-        response_data = response.json()
-
-        # Depuración: Ver la respuesta de Zabbix
-        print(f"Respuesta de Zabbix: {response_data}")
-
-        return response_data.get('result', [])
-    except Exception as e:
-        print(f"Error al buscar hosts: {e}")
-        return []
+    response = requests.post(ZABBIX_URL, json=payload, headers=headers)
+    return response.json().get('result', [])
 
 
 # Función para obtener problemas en un host específico
@@ -73,6 +63,7 @@ def get_problems(auth_token, host_id, filter_name):
     headers = {'Content-Type': 'application/json-rpc'}
     response = requests.post(ZABBIX_URL, json=payload, headers=headers)
     return response.json().get('result', [])
+
 
 # Función para obtener gráficas en un host específico
 def get_graphs(auth_token, host_id, filter_name):
@@ -108,6 +99,8 @@ def get_items(auth_token, host_id, filter_name):
     response = requests.post(ZABBIX_URL, json=payload, headers=headers)
     return response.json().get('result', [])
 
+
+
 # Función para generar la URL de la gráfica o del elemento
 def generate_graph_url(graph_id=None, item_id=None, chart_type="chart.php"):
     base_url = f"http://10.144.2.194/zabbix/{chart_type}"
@@ -121,4 +114,5 @@ def generate_graph_url(graph_id=None, item_id=None, chart_type="chart.php"):
         return url
     else:
         raise ValueError("Debe proporcionar un graph_id o un item_id.")
+  
 
