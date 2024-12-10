@@ -2,6 +2,7 @@ import requests
 import time
 from io import BytesIO
 
+
 ZABBIX_URL = "http://10.144.2.194/zabbix/api_jsonrpc.php"
 
 # Función para obtener problemas en un host específico
@@ -44,7 +45,6 @@ def get_graphs(auth_token, host_id,item_tipo):
     graphs = response.json()  # Aquí asumo que la API devuelve un JSON
     print("Gráficas obtenidas:", graphs)  # Verifica si las gráficas están siendo devueltas
     return response.json().get('result', [])
-
 
 def get_inter1(auth_token, host_id):
     # Payload modificado para buscar "Gigabit" en los gráficos
@@ -99,7 +99,6 @@ def get_inter1(auth_token, host_id):
 
     # Devolvemos el diccionario con nombres y graphid
     return filtered_graphs
-
 
 def get_inter2(auth_token, host_id):
     # Payload modificado para buscar "Gigabit" en los gráficos
@@ -237,6 +236,75 @@ def get_inter_cliente(auth_token, host_id):
     }
 
     return filtered_graphs
+
+def get_hosts_by_location(auth_token, location_value):
+    payload = {
+        "jsonrpc": "2.0",
+        "method": "host.get",
+        "params": {
+            "output": ["hostid", "name"],  # Solo se obtienen hostid y name
+            "filter": {
+                "site_state": location_value  # Filtra por 'site_state'
+            }
+        },
+        "auth": auth_token,
+        "id": 1
+    }
+
+    headers = {'Content-Type': 'application/json-rpc'}
+    response = requests.post(ZABBIX_URL, json=payload, headers=headers)
+
+    if response.status_code == 200:
+        try:
+            hosts = response.json().get('result', [])
+            return hosts
+        except ValueError:
+            print("Error al procesar la respuesta JSON.")
+            return []
+    else:
+        print(f"Error en la solicitud de consulta de hosts: {response.status_code} - {response.text}")
+        return []
+
+
+def get_problems_by_hosts(auth_token, filter_value):
+    payload = {
+        "jsonrpc": "2.0",
+        "method": "problem.get",
+        "params": {
+            "output": "extend",
+            "selectAcknowledges": "extend",
+            "selectTags": "extend",
+            "selectSuppressionData": "extend",
+            "search": {
+                "host": filter_value
+            },
+            "severities": [4],  
+            "recent": True,
+            "sortfield": ["eventid"],
+            "sortorder": "DESC"
+        },
+        "auth": auth_token,
+        "id": 4
+    }
+
+    headers = {'Content-Type': 'application/json-rpc'}
+    response = requests.post(ZABBIX_URL, json=payload, headers=headers)
+
+    if response.status_code == 200:
+        try:
+            problems = response.json().get('result', [])
+            # Imprimir resultados en la terminal
+            print(f"Resultados para {filter_value}:")
+            for problem in problems:
+                print(f"ID: {problem['eventid']}, Problema: {problem['name']}")
+            return problems
+        except ValueError:
+            print("Error al procesar la respuesta JSON.")
+            return []
+    else:
+        print(f"Error en la solicitud de consulta: {response.status_code} - {response.text}")
+        return []
+
 
 
 def generate_graph_url(graph_id=None, item_id=None, chart_type="chart.php"):

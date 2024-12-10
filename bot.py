@@ -1,4 +1,4 @@
-from telegram import Update, ForceReply, ReplyKeyboardMarkup
+from telegram import Update, ForceReply, ReplyKeyboardMarkup, KeyboardButton, ReplyKeyboardRemove, InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.ext import ContextTypes, ConversationHandler
 from auth import zabbix_login
 from search import search_host_by_name
@@ -7,6 +7,8 @@ from problems import get_graphs
 from problems import get_inter1
 from problems import get_inter2
 from problems import get_inter3
+from problems import get_hosts_by_location
+from problems import get_problems_by_hosts
 from problems import get_inter_cliente
 from problems import generate_graph_url
 from problems import download_image
@@ -15,7 +17,11 @@ from telegram.ext import CallbackContext
 from telegram import ForceReply
 import json
 
-USERNAME, PASSWORD, CHOICE, NEW_SEARCH, HOST_TYPE, HOST_NAME, SELECTED_HOST, GRAPH_CHOICE, GRAPH_CHOICE2, GRAPH_CHOICE3, GRAPH_CHOICE4, LOCATION_NAME, SEARCH_TYPE = range(13)
+(
+    USERNAME, PASSWORD, CHOICE, NEW_SEARCH, HOST_TYPE, HOST_NAME, 
+    SELECTED_HOST, GRAPH_CHOICE, GRAPH_CHOICE2, GRAPH_CHOICE3, GRAPH_CHOICE4, 
+    LOCATION_NAME, SEARCH_TYPE, SHOW_PROBLEMS, SELECTED_LOCATION
+) = range(15)
 
 # Definir los estados de la conversación
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -151,8 +157,11 @@ async def handle_search_type(update: Update, context: ContextTypes.DEFAULT_TYPE)
     return await ask_search_type(update, context)  # Volver a preguntar
 
 async def ask_location_name(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    # Solicitar al usuario que ingrese el nombre del departamento o municipio
     await update.message.reply_text("Por favor, ingresa el nombre del departamento o municipio:")
-    return LOCATION_NAME  # Devuelve al estado de LOCATION_NAME para seguir el flujo
+    
+    # Pasar al estado LOCATION_NAME donde se espera la respuesta del usuario
+    return LOCATION_NAME  # Esperar la entrada del usuario
 
 
 async def ask_graph_choice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -258,8 +267,83 @@ async def handle_graph_choice2(update: Update, context: ContextTypes.DEFAULT_TYP
     context.user_data['graph_choice2'] = graph_choice2
     return await ask_host_name(update, context)  # Preguntar por el nombre del host
 
+# Función para manejar la búsqueda de problemas por ubicación
+async def location_search(update, context):
+    location_name = update.message.text.strip()  # Nombre del municipio o departamento
     
+    if location_name:
+        # Obtener el token de autenticación
+        auth_token = context.user_data.get("auth_token")
+        
+        # Consultar los hosts asociados a la ubicación
+        hosts = get_hosts_by_location(auth_token, location_name)
+        
+        if not hosts:
+            await update.message.reply_text("No se encontraron hosts para esa ubicación.")
+            return LOCATION_NAME
 
+        # Contar problemas encontrados
+        total_problems = 0
+        
+        for host in hosts:
+            host_name = host["name"]
+            problems = get_problems_by_hosts(auth_token, host_name)
+            total_problems += len(problems)
+        
+        # Crear botón con el nombre de la ubicación
+        keyboard = [
+            [InlineKeyboardButton(f"{location_name} ({total_problems} problemas)", callback_data="show_location")]
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+
+        await update.message.reply_text(
+            f"Se encontraron {total_problems} problemas en {location_name}.",
+            reply_markup=reply_markup
+        )
+        return SHOW_PROBLEMS
+
+    else:
+        await update.message.reply_text("Por favor, ingresa un nombre de ubicación válido.")
+        return LOCATION_NAME
+
+# Función para manejar la respuesta de los botones (Sí o No)
+async def handle_new_search_choice(update, context):
+    choice = update.message.text.strip()
+
+    if choice == "Sí":
+        # Volver a preguntar por el problema
+        await update.message.reply_text("Por favor, ingresa el nombre de la ubicación (municipio o departamento).")
+        return LOCATION_NAME  # Regresar al estado LOCATION_NAME para hacer una nueva consulta
+
+    elif choice == "No":
+        # Detener la conversación
+        await update.message.reply_text("Gracias por usar el bot. ¡Hasta luego!")
+        return ConversationHandler.END  # Terminar la conversación
+
+
+async def show_selected_location(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    location = update.message.text.strip()  # Obtener la ubicación seleccionada
+
+    # Verificar si la ubicación está en las sugerencias almacenadas
+    if 'location_suggestions' in context.user_data:
+        location_suggestions = context.user_data['location_suggestions']
+        
+        # Si la ubicación seleccionada está entre las sugerencias, continuar
+        if location not in location_suggestions:
+            await update.message.reply_text(f"La ubicación '{location}' no está en las sugerencias disponibles.")
+            return SELECTED_LOCATION  # Volver a mostrar las sugerencias
+
+        # Si la ubicación es válida, procesar la búsqueda de problemas
+        await update.message.reply_text(f"Buscando problemas en la ubicación '{location}'...")
+        
+        # Aquí podrías llamar a tu función para obtener problemas basados en la ubicación
+        # Ejemplo: context.user_data['problems_found'] = obtener_problemas(location)
+        # Luego, podrías continuar con el flujo de mostrar los problemas.
+        return SHOW_PROBLEMS  # Avanzar al siguiente paso del flujo
+
+    # Si no hay sugerencias previas, pedir al usuario que ingrese nuevamente la ubicación
+    await update.message.reply_text("No se encontraron sugerencias de ubicación. Intenta nuevamente.")
+    return SELECTED_LOCATION
 
 # 6. Función para preguntar el nombre del host
 async def ask_host_name(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
