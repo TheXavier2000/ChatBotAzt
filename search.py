@@ -13,8 +13,14 @@ async def search_host_by_name(auth_token, host_name,host_type):
     elif host_type=="Plantas":
          group=76
 
-
+    elif host_type=="OLT":
+         group=74
+    elif host_type=="Switch":
+         group=79   
+    elif host_type=="Agregadores/Concentradores/PE":
+         group=109  
          
+  
     payload = {
         "jsonrpc": "2.0",
         "method": "host.get",

@@ -1,4 +1,4 @@
-from telegram import Update, ForceReply, ReplyKeyboardMarkup
+from telegram import Update, ForceReply, ReplyKeyboardMarkup, KeyboardButton, ReplyKeyboardRemove, InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.ext import ContextTypes, ConversationHandler
 from auth import zabbix_login
 from search import search_host_by_name
@@ -7,6 +7,8 @@ from problems import get_graphs
 from problems import get_inter1
 from problems import get_inter2
 from problems import get_inter3
+from problems import get_hosts_by_location
+from problems import get_problems_by_hosts
 from problems import get_inter_cliente
 from problems import generate_graph_url
 from problems import download_image
@@ -14,8 +16,17 @@ import requests
 from telegram.ext import CallbackContext
 from telegram import ForceReply
 import json
-
-USERNAME, PASSWORD, CHOICE, NEW_SEARCH, HOST_TYPE, HOST_NAME, SELECTED_HOST,GRAPH_CHOICE,GRAPH_CHOICE2,GRAPH_CHOICE3,GRAPH_CHOICE4 = range(11)
+from  dep import get_gigabit_problems
+from  dep import  process_events
+from  dep import  get_event_details 
+from  dep import convert_to_colombia_time
+from  dep import calculate_duration
+from  dep import create_table_image
+(
+    USERNAME, PASSWORD, CHOICE, NEW_SEARCH, HOST_TYPE, HOST_NAME, 
+    SELECTED_HOST, GRAPH_CHOICE, GRAPH_CHOICE2, GRAPH_CHOICE3, GRAPH_CHOICE4,  EQUIPO1,
+    LOCATION_NAME, SEARCH_TYPE, SHOW_PROBLEMS, SELECTED_LOCATION,SELECTING_DEPARTMENT,NEW_SEARCH1, PROBLEMAS1
+) = range(19)
 
 # Definir los estados de la conversación
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -46,12 +57,12 @@ async def handle_password(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     
     # Obtener el ID único del mensaje (el que contiene la contraseña)
     message_id = update.message.message_id  # ID del mensaje que contiene la contraseña
-    print(f"Mensaje con ID {message_id} recibido. Intentando eliminarlo.")
+   
     
     try:
         # Eliminar el mensaje con la contraseña usando el ID único
         update.message.delete()  # Borra el mensaje del usuario que contiene la contraseña
-        print(f"Mensaje con ID {message_id} borrado correctamente.")
+       
     except Exception as e:
         print(f"Error al borrar el mensaje: {e}")
     username = context.user_data.get('username')
@@ -71,13 +82,24 @@ async def handle_password(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
 
 # 2. Función para preguntar por el tipo de host
 async def ask_host_type(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    
     keyboard = [["Equipos Networking", "Clientes", "Rectificadores","Plantas"]]
     reply_markup = ReplyKeyboardMarkup(keyboard, one_time_keyboard=True)
+ # Comprobamos si la actualización es un mensaje
+    if update.message:
+        await update.message.reply_text("¿Cuál es el tipo de host que estás buscando?",reply_markup=reply_markup)
+    # Si la actualización es una CallbackQuery (probablemente de un botón inline)
+    elif update.callback_query:
+        await update.callback_query.message.reply_text("¿Cuál es el tipo de host que estás buscando?",reply_markup=reply_markup)
+        await update.callback_query.answer()  # Confirmamos la acción del botón
+    else:
+        # Si no hay ni un mensaje ni una CallbackQuery, lo manejamos de alguna manera
+        await update.effective_chat.send_message("Error: No se puede manejar la actualización.")
 
-    await update.message.reply_text(
-        "¿Qué tipo deseas buscar? (Si tienes dudas sobre los comandos usa /help)\n\n",
-        reply_markup=reply_markup
-    )
+    #await update.message.reply_text(
+      #  "¿Qué tipo deseas buscar? (Si tienes dudas sobre los comandos usa /help)\n\n",
+     #   reply_markup=reply_markup
+    #)
     return HOST_TYPE  # Cambia al estado de tipo de host
 
 # 3. Manejo de la respuesta sobre el tipo de host
@@ -90,11 +112,35 @@ async def handle_host_type(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         await update.message.reply_text("Consulta no válida, inténtelo de nuevo.")
         return await ask_host_type(update, context)  # Volver a preguntar por el tipo de host
     
+    if host_type == "Equipos Networking":
+            # Preguntar por el tipo de gráfica para Rectificadores
+            keyboard = [["Switch", "OLT","Agregadores/Concentradores/PE"]]
+            reply_markup = ReplyKeyboardMarkup(keyboard, one_time_keyboard=True)
+            await update.message.reply_text(
+                "¿Qué tipo de Equipo desea Buscar ?",
+                reply_markup=reply_markup
+            )
+            return EQUIPO1 # Redirigimos al estado para la selección de gráficos 
+    else:
+
+       await update.message.reply_text(f"Has elegido buscar: {host_type}.")
+       # Ahora que el tipo de host ha sido seleccionado, preguntar por la opción de búsqueda
+       return await ask_choice(update, context)  # Ahora se pregunta por la opción de búsqueda (Buscar host o Buscar gráficas)
+    
+async def handle_selected_equipo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    host_type = update.message.text
+    context.user_data['host_type'] = host_type  # Guardar el tipo de host seleccionado
+
+    # Validación del tipo de host
+    if host_type not in ["Switch", "OLT","Agregadores/Concentradores/PE"]:
+        await update.message.reply_text("Consulta no válida, inténtelo de nuevo.")
+        return await ask_host_type(update, context)  # Volver a preguntar por el tipo de host
+    
     await update.message.reply_text(f"Has elegido buscar: {host_type}.")
-
-    # Ahora que el tipo de host ha sido seleccionado, preguntar por la opción de búsqueda
+       # Ahora que el tipo de host ha sido seleccionado, preguntar por la opción de búsqueda
     return await ask_choice(update, context)  # Ahora se pregunta por la opción de búsqueda (Buscar host o Buscar gráficas)
-
+    
+    
 # 4. Función para preguntar por la opción de búsqueda
 async def ask_choice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     keyboard = [["Buscar Problemas", "Buscar gráficas"]]
@@ -116,15 +162,195 @@ async def handle_choice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
         return await ask_choice(update, context)  # Volver a preguntar por la opción
 
     if choice == "Buscar Problemas":
-        
-        await update.message.reply_text("Has elegido buscar Problemas.")
-        return await ask_host_name(update, context)  # Preguntar por el nombre del host
+
+        return await ask_search_type(update, context)  # Redirigir al flujo correcto para elegir búsqueda (Host o Locación)
+
 
     elif choice == "Buscar gráficas":
         await update.message.reply_text("Has elegido buscar gráficas.")
-        return await ask_graph_choice(update, context)  # Preguntar por el nombre del host (gráficas)
-    
+        return await ask_graph_choice(update, context)  # Función para buscar gráficas
 
+# Pregunta el tipo de problema a seleccionar (Host o Locación)
+async def ask_search_type(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    keyboard = [["Por Host", "Por Locación"]]  # Opciones para elegir
+    reply_markup = ReplyKeyboardMarkup(keyboard, one_time_keyboard=True)
+
+    await update.message.reply_text(
+        "¿Cómo deseas realizar la búsqueda de problemas?",
+        reply_markup=reply_markup  # Mostrar las opciones de búsqueda
+    )
+    return SEARCH_TYPE  # Cambia al estado de elegir tipo de búsqueda (Host o Locación)
+
+# Manejo de la selección de búsqueda (Por Host o Por Locación)
+async def handle_search_type(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    search_type = update.message.text.strip().lower()  # Normalizar la entrada
+    context.user_data['search_type'] = search_type  # Guardar el tipo de búsqueda
+
+    opciones_validas = {"por host": ask_host_name, "por locación": ask_location_name}  # Redirigir a las funciones correctas
+
+    if search_type in opciones_validas:
+        return await opciones_validas[search_type](update, context)  # Redirige al flujo adecuado
+
+    # Manejo de error
+    await update.message.reply_text(
+        "Opción no válida. Por favor, elija entre:\n")
+    return await ask_search_type(update, context)  # Volver a preguntar
+
+async def ask_location_name(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    # Solicitar al usuario que ingrese el nombre del departamento o municipio
+    host_type = context.user_data.get('host_type') 
+    if host_type == "Rectificadores":
+            # Preguntar por el tipo de gráfica para Rectificadores
+            keyboard = [["Unavailable by ICMP ping", "Puerta abierta", "Descarga batería", "Voltaje batería"]]
+            reply_markup = ReplyKeyboardMarkup(keyboard, one_time_keyboard=True)
+            await update.message.reply_text(
+                "¿Qué tipo de Problema desea Buscar Rectificadores?",
+                reply_markup=reply_markup
+            )
+            return PROBLEMAS1 # Redirigimos al estado para la selección de gráficos 
+    else:
+         
+         await update.message.reply_text("Buscando problemas por favor espere")
+         return await problemas(update, context)
+
+async def handle_problemas1(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    
+    tipo_problema = update.message.text
+    context.user_data['tipo_problema'] = tipo_problema  # Guardar la elección 
+    host_type = context.user_data.get('host_type')  # Recuperar el tipo de host
+
+    if tipo_problema not in ["Unavailable by ICMP ping", "Puerta abierta", "Descarga batería", "Voltaje batería"]:
+        await update.message.reply_text("Consulta no válida, inténtelo de nuevo.")
+        return await ask_location_name(update, context)  # Volver a preguntar por el tipo de gráfica
+
+    else:  
+         await update.message.reply_text("Buscando problemas por favor espere")
+         return await problemas(update, context)
+
+async def problemas(update: Update, context: CallbackContext):
+    host_type = context.user_data.get('host_type')  # Recuperar el tipo de host
+    auth_token = context.user_data.get('auth_token')
+    tipo_problema = context.user_data.get('tipo_problema')
+    if host_type == "Rectificadores":
+        tipo= tipo_problema
+    else:
+         tipo= "Unavailable by ICMP ping"
+     
+            
+    if auth_token:
+        problems = get_gigabit_problems(auth_token,host_type,tipo)
+        if problems:
+            department_msg, reply_markup, department_count = process_events(auth_token, problems)
+            #await update.message.reply_text(department_msg, reply_markup=reply_markup)
+            if update.message:
+             # Si es un mensaje, acceder a update.message.text
+             await update.message.reply_text(department_msg, reply_markup=reply_markup)
+            elif update.callback_query:
+              # Si es un CallbackQuery, acceder a update.callback_query.message
+             await update.callback_query.message.reply_text(department_msg, reply_markup=reply_markup)
+               # Responder al CallbackQuery para evitar que quede pendiente
+             await update.callback_query.answer()
+            
+            # Guardamos los datos en context.user_data
+            context.user_data['department_count'] = department_count
+            context.user_data['auth_token'] = auth_token
+            context.user_data['problems'] = problems  # Guardamos los problemas obtenidos
+            return SELECTING_DEPARTMENT
+            #return DEPARTAMENTO
+            #return await handle_department_selection(update, context)
+           # await ask_new_search(update, context)
+            #return NEW_SEARCH  
+        
+        else:
+            await update.message.reply_text("No se encontraron problemass.")
+    else:
+        await update.message.reply_text("No se pudo autenticar correctamente.")
+
+     
+async def handle_department_selection(update: Update, context: CallbackContext):
+    # Verifica si ya se ha finalizado la conversación o si estamos en una nueva búsqueda
+    if context.user_data.get('is_new_search', False):
+        # Si estamos en una nueva búsqueda, no procesamos la selección del departamento
+        context.user_data['is_new_search'] = False  # Reseteamos la bandera de nueva búsqueda
+        await update.callback_query.answer()
+        return  # Detenemos el flujo de la selección del departamento
+
+    selection = update.callback_query.data
+    department_count = context.user_data.get('department_count', {})
+
+    # Si el usuario selecciona "Mostrar todo"
+    if selection == "Mostrar todo":
+        context.user_data['department_filter'] = None
+    elif selection in department_count:
+        context.user_data['department_filter'] = selection
+    else:
+        context.user_data['department_filter'] = None
+
+    # Guardar la selección del usuario
+    department_filter = context.user_data.get('department_filter')
+    
+    # Enviar un mensaje con la selección del departamento
+    if department_filter:
+        await update.callback_query.answer()
+        await update.callback_query.message.reply_text(f"Seleccionaste el departamento: {department_filter}")
+    else:
+        await update.callback_query.answer()
+        await update.callback_query.message.reply_text("Seleccionaste 'Mostrar todo'")
+
+    # Filtrar los problemas según la selección
+    problems = context.user_data.get('problems', [])
+    auth_token = context.user_data.get('auth_token')
+    eventids = [problem.get("eventid") for problem in problems if problem.get("eventid")]
+    event_details = get_event_details(auth_token, eventids)
+
+    results = []
+    for event in event_details:
+        host_name = event['hosts'][0]['host'] if 'hosts' in event and len(event['hosts']) > 0 else "Desconocido"
+        department = "No disponible"
+        municipality = "No disponible"
+        problem_name = "No disponible"
+        start_time = "No disponible"
+
+        if 'tags' in event:
+            for tag in event['tags']:
+                if tag['tag'] == 'Departamento':
+                    department = tag['value']
+                if tag['tag'] == 'Municipio':
+                    municipality = tag['value']
+
+        problem_name = event.get("name", "No disponible")
+        if 'clock' in event:
+            start_time = convert_to_colombia_time(event['clock'])
+
+        # Aplicar el filtro de departamento si existe
+        if department_filter and department_filter != department:
+            continue
+
+        event_time = convert_to_colombia_time(event['clock']) if 'clock' in event else "No disponible"
+        duration = calculate_duration(event_time) if event_time != "No disponible" else "No disponible"
+
+        # Agregar los datos
+        results.append([start_time, host_name, problem_name, duration, department, municipality])
+
+    if results:
+        # Crear la tabla como imagen
+        img_buf = create_table_image(results)
+        await update.callback_query.answer()
+
+        if update.callback_query.message:
+            await update.callback_query.message.reply_text("Aquí están los resultados filtrados:")
+            await update.callback_query.message.reply_photo(photo=img_buf)
+            await ask_new_search1(update, context)  # Preguntar si quiere hacer una nueva búsqueda
+            return NEW_SEARCH1 
+
+    else:
+        await update.callback_query.answer()
+        if update.callback_query.message:
+            await update.callback_query.message.reply_text("No se encontraron problemas para mostrar.")
+            await ask_new_search1(update, context)  # Preguntar si quiere hacer una nueva búsqueda
+            return NEW_SEARCH1 
+ 
+     
 async def ask_graph_choice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     host_type = context.user_data.get('host_type')
     
@@ -138,7 +364,8 @@ async def ask_graph_choice(update: Update, context: ContextTypes.DEFAULT_TYPE) -
                 reply_markup=reply_markup
             )
             return GRAPH_CHOICE  # Redirigimos al estado para la selección de gráficos
-    elif host_type == "Equipos Networking" :
+    #elif host_type == "Equipos Networking" :
+    elif host_type in ["Switch", "OLT", "Agregadores/Concentradores/PE"]:
             # Preguntar por el tipo de gráfica para Clientes
             keyboard = [["Estado General", "Interfaces"]]
             reply_markup = ReplyKeyboardMarkup(keyboard, one_time_keyboard=True)
@@ -228,8 +455,83 @@ async def handle_graph_choice2(update: Update, context: ContextTypes.DEFAULT_TYP
     context.user_data['graph_choice2'] = graph_choice2
     return await ask_host_name(update, context)  # Preguntar por el nombre del host
 
+# Función para manejar la búsqueda de problemas por ubicación
+async def location_search(update, context):
+    location_name = update.message.text.strip()  # Nombre del municipio o departamento
     
+    if location_name:
+        # Obtener el token de autenticación
+        auth_token = context.user_data.get("auth_token")
+        
+        # Consultar los hosts asociados a la ubicación
+        hosts = get_hosts_by_location(auth_token, location_name)
+        
+        if not hosts:
+            await update.message.reply_text("No se encontraron hosts para esa ubicación.")
+            return LOCATION_NAME
 
+        # Contar problemas encontrados
+        total_problems = 0
+        
+        for host in hosts:
+            host_name = host["name"]
+            problems = get_problems_by_hosts(auth_token, host_name)
+            total_problems += len(problems)
+        
+        # Crear botón con el nombre de la ubicación
+        keyboard = [
+            [InlineKeyboardButton(f"{location_name} ({total_problems} problemas)", callback_data="show_location")]
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+
+        await update.message.reply_text(
+            f"Se encontraron {total_problems} problemas en {location_name}.",
+            reply_markup=reply_markup
+        )
+        return SHOW_PROBLEMS
+
+    else:
+        await update.message.reply_text("Por favor, ingresa un nombre de ubicación válido.")
+        return LOCATION_NAME
+
+# Función para manejar la respuesta de los botones (Sí o No)
+async def handle_new_search_choice(update, context):
+    choice = update.message.text.strip()
+
+    if choice == "Sí":
+        # Volver a preguntar por el problema
+        await update.message.reply_text("Por favor, ingresa el nombre de la ubicación (municipio o departamento).")
+        return LOCATION_NAME  # Regresar al estado LOCATION_NAME para hacer una nueva consulta
+
+    elif choice == "No":
+        # Detener la conversación
+        await update.message.reply_text("Gracias por usar el bot. ¡Hasta luego!")
+        return ConversationHandler.END  # Terminar la conversación
+
+
+async def show_selected_location(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    location = update.message.text.strip()  # Obtener la ubicación seleccionada
+
+    # Verificar si la ubicación está en las sugerencias almacenadas
+    if 'location_suggestions' in context.user_data:
+        location_suggestions = context.user_data['location_suggestions']
+        
+        # Si la ubicación seleccionada está entre las sugerencias, continuar
+        if location not in location_suggestions:
+            await update.message.reply_text(f"La ubicación '{location}' no está en las sugerencias disponibles.")
+            return SELECTED_LOCATION  # Volver a mostrar las sugerencias
+
+        # Si la ubicación es válida, procesar la búsqueda de problemas
+        await update.message.reply_text(f"Buscando problemas en la ubicación '{location}'...")
+        
+        # Aquí podrías llamar a tu función para obtener problemas basados en la ubicación
+        # Ejemplo: context.user_data['problems_found'] = obtener_problemas(location)
+        # Luego, podrías continuar con el flujo de mostrar los problemas.
+        return SHOW_PROBLEMS  # Avanzar al siguiente paso del flujo
+
+    # Si no hay sugerencias previas, pedir al usuario que ingrese nuevamente la ubicación
+    await update.message.reply_text("No se encontraron sugerencias de ubicación. Intenta nuevamente.")
+    return SELECTED_LOCATION
 
 # 6. Función para preguntar el nombre del host
 async def ask_host_name(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -307,7 +609,8 @@ async def handle_selected_host(update: Update, context: ContextTypes.DEFAULT_TYP
                 elif graph_choice ==  "Estado General":
                     tipo = ["ICMP"]  # Esto ahora es una lista, igual que en el caso de "Rectificadores"
                  
-            elif host_type == "Equipos Networking":
+            #elif host_type == "Equipos Networking":
+            elif host_type in ["Switch", "OLT", "Agregadores/Concentradores/PE"]:
                 if graph_choice ==  "Estado General":
                    tipo = ["ICMP"]  # Esto ahora es una lista, igual que en el caso de s"
                 elif graph_choice == "Interfaces": 
@@ -496,3 +799,38 @@ async def help(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     )
 
     await update.message.reply_text(help_message)
+
+async def ask_new_search1(update: Update, context: CallbackContext) -> None:
+    keyboard = [
+        [InlineKeyboardButton("Sí", callback_data="Sí")],
+        [InlineKeyboardButton("No", callback_data="No")]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+
+    # Preguntar si el usuario quiere hacer una nueva búsqueda
+    await update.callback_query.message.reply_text(
+        "¿Deseas hacer una nueva búsqueda?",
+        reply_markup=reply_markup
+    )
+
+
+# Función para procesar la respuesta del usuario para nueva búsqueda
+async def handle_new_search1(update: Update, context: CallbackContext) -> int:
+    answer = update.callback_query.data  # Obtén la respuesta desde callback_data
+    print(f"Respuesta de nueva búsqueda: {answer}")
+
+    if answer == "Sí":
+        #await update.callback_query.answer()
+        return await ask_host_type(update, context)# Volver a llamar la función que busca problemas
+        
+
+    elif answer == "No":
+        await update.callback_query.answer()
+        await update.callback_query.message.reply_text("Gracias por usar el bot. La conversación ha finalizado.")
+        return ConversationHandler.END  # Termina la conversación
+
+    else:
+        await update.callback_query.answer()
+        await update.callback_query.message.reply_text("Respuesta no válida. Por favor elige 'Sí' o 'No'.")
+        await ask_new_search1(update, context)  # Preguntar de nuevo
+        return NEW_SEARCH1  # Mantener el estado actual para continuar
