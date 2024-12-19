@@ -201,7 +201,7 @@ async def ask_location_name(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     host_type = context.user_data.get('host_type') 
     if host_type == "Rectificadores":
             # Preguntar por el tipo de gráfica para Rectificadores
-            keyboard = [["Unavailable by ICMP ping", "Puerta abierta", "Descarga batería", "Voltaje batería"]]
+            keyboard = [["Unavailable by ICMP ping", "Puerta abierta","Descarga batería","Voltaje batería"]]
             reply_markup = ReplyKeyboardMarkup(keyboard, one_time_keyboard=True)
             await update.message.reply_text(
                 "¿Qué tipo de Problema desea Buscar Rectificadores?",
@@ -219,7 +219,7 @@ async def handle_problemas1(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     context.user_data['tipo_problema'] = tipo_problema  # Guardar la elección 
     host_type = context.user_data.get('host_type')  # Recuperar el tipo de host
 
-    if tipo_problema not in ["Unavailable by ICMP ping", "Puerta abierta", "Descarga batería", "Voltaje batería"]:
+    if tipo_problema not in ["Unavailable by ICMP ping", "Puerta abierta","Descarga batería","Voltaje batería"]:
         await update.message.reply_text("Consulta no válida, inténtelo de nuevo.")
         return await ask_location_name(update, context)  # Volver a preguntar por el tipo de gráfica
 
@@ -235,10 +235,14 @@ async def problemas(update: Update, context: CallbackContext):
         tipo= tipo_problema
     else:
          tipo= "Unavailable by ICMP ping"
-     
-            
+
+    if tipo_problema == "Descarga batería" or tipo_problema == "Voltaje batería": 
+        severity=2
+    else:     
+         severity=4   
+
     if auth_token:
-        problems = get_gigabit_problems(auth_token,host_type,tipo)
+        problems = get_gigabit_problems(auth_token,host_type,tipo,severity)
         if problems:
             department_msg, reply_markup, department_count = process_events(auth_token, problems)
             #await update.message.reply_text(department_msg, reply_markup=reply_markup)
@@ -310,6 +314,7 @@ async def handle_department_selection(update: Update, context: CallbackContext):
         municipality = "No disponible"
         problem_name = "No disponible"
         start_time = "No disponible"
+        opdata = "No disponible"
 
         if 'tags' in event:
             for tag in event['tags']:
@@ -318,6 +323,7 @@ async def handle_department_selection(update: Update, context: CallbackContext):
                 if tag['tag'] == 'Municipio':
                     municipality = tag['value']
 
+        opdata = event.get("opdata", "No disponible")
         problem_name = event.get("name", "No disponible")
         if 'clock' in event:
             start_time = convert_to_colombia_time(event['clock'])
@@ -328,9 +334,11 @@ async def handle_department_selection(update: Update, context: CallbackContext):
 
         event_time = convert_to_colombia_time(event['clock']) if 'clock' in event else "No disponible"
         duration = calculate_duration(event_time) if event_time != "No disponible" else "No disponible"
-
+        if opdata== "":
+            opdata="No disponible"
+            
         # Agregar los datos
-        results.append([start_time, host_name, problem_name, duration, department, municipality])
+        results.append([start_time, host_name, problem_name,opdata, duration, department, municipality])
 
     if results:
         # Crear la tabla como imagen

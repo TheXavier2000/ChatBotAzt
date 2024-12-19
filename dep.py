@@ -14,7 +14,7 @@ import pytz
 ZABBIX_URL = "http://10.144.2.194/zabbix/api_jsonrpc.php"
 
 # Función para consultar problemas
-def get_gigabit_problems(auth_token,host_type,tipo):
+def get_gigabit_problems(auth_token,host_type,tipo,severity):
     if host_type=="Equipos Networking":
        group=50
     elif host_type=="Clientes":
@@ -40,7 +40,7 @@ def get_gigabit_problems(auth_token,host_type,tipo):
             "search": {
                 "name": tipo
             },
-            "severities": [4],
+            "severities": severity,
             "recent": True,
             "sortfield": ["eventid"],
             "sortorder": "DESC"
@@ -174,13 +174,15 @@ async def start(update: Update, context: CallbackContext):
 
 
 
+# Función para generar una tabla con matplotlib y devolverla como imagen
 def create_table_image(results):
-    fig, ax = plt.subplots(figsize=(10, len(results) * 0.5))  # Ajusta el tamaño según el número de filas
+    # Definir las columnas de la tabla (en el orden que deseas)
+    columns = ["Hora de inicio", "Host", "Problema","Operational data", "Duración", "Departamento", "Municipio"]
+
+    # Ajustar el tamaño de la figura según el número de filas y el número de columnas
+    fig, ax = plt.subplots(figsize=(len(results) * 0.15, len(columns) * 0.5))  # Ajusta el tamaño según el número de filas y columnas
     ax.axis('tight')
     ax.axis('off')
-
-    # Definir las columnas de la tabla (en el orden que deseas)
-    columns = ["Hora de inicio", "Host", "Problema", "Duración", "Departamento", "Municipio"]
 
     # Crear los datos para la tabla
     rows = [list(row) for row in results]
@@ -190,16 +192,22 @@ def create_table_image(results):
 
     # Ajustar el tamaño de las celdas
     table.auto_set_font_size(False)
-    table.set_fontsize(10)
-    table.auto_set_column_width(col=list(range(len(columns))))
+    table.set_fontsize(8)  # Reducir el tamaño de la fuente para adaptarse mejor
+
+    # Ajustar el ancho de las columnas (con valores más grandes o pequeños según sea necesario)
+    column_widths = [0.2, 0.2, 0.3, 0.2,0.2, 0.2, 0.2]  # Ajusta estos valores según el contenido
+    for i, width in enumerate(column_widths):
+        table.auto_set_column_width(col=[i])  # Establecer el ancho para cada columna de forma individual
+
+    # Ajustar el espacio entre las celdas y la figura para evitar el corte
+    plt.subplots_adjust(left=0.05, right=0.95, top=0.95, bottom=0.05)
 
     # Guardar la imagen en un buffer
     img_buf = BytesIO()
-    plt.savefig(img_buf, format='png')
+    plt.savefig(img_buf, format='png', bbox_inches='tight')  # Ajustar la figura de forma ajustada
     img_buf.seek(0)  # Reiniciar el puntero a la primera posición
 
     # Cerrar la figura para liberar recursos
     plt.close(fig)
 
     return img_buf
-
