@@ -22,6 +22,7 @@ from  dep import  get_event_details
 from  dep import convert_to_colombia_time
 from  dep import calculate_duration
 from  dep import create_table_image
+from  dep import create_table_image_incidents
 (
     USERNAME, PASSWORD, CHOICE, NEW_SEARCH, HOST_TYPE, HOST_NAME, 
     SELECTED_HOST, GRAPH_CHOICE, GRAPH_CHOICE2, GRAPH_CHOICE3, GRAPH_CHOICE4,  EQUIPO1,
@@ -907,31 +908,91 @@ async def list_incidents(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     return HOST_TYPE  # Cambia al estado de tipo de host
 
 # Función para manejar los diferentes incidentes a consultar
-async def handle_incident_selection(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Maneja la selección de una opción de incidentes."""
-    incident_choice = update.message.text
+async def handle_incident_selection(update: Update, context: CallbackContext):
+    # Verifica si ya se ha finalizado la conversación o si estamos en una nueva búsqueda
+    if context.user_data.get('is_new_search', False):
+        # Si estamos en una nueva búsqueda, no procesamos la selección del incidente
+        context.user_data['is_new_search'] = False  # Reseteamos la bandera de nueva búsqueda
+        await update.callback_query.answer()
+        return  # Detenemos el flujo de la selección del incidente
 
-    # Opciones válidas para incidentes
-    valid_incidents = [
-        "Nodos caídos", 
-        "Nodos en descarga", 
-        "Puertas Abiertas", 
-        "Top 10 Saturación de Agregadores en los últimmos 10 minutos"
-    ]
+    selection = update.callback_query.data  # Opción seleccionada por el usuario
+    incident_filter = context.user_data.get('incident_filter', {})
 
-    if incident_choice not in valid_incidents:
-        await update.message.reply_text("Opción no válida, por favor seleccione una opción del teclado.")
-        return HOST_TYPE  # Volver a las opciones de incidentes
+    # Guardar la selección del usuario
+    context.user_data['incident_filter'] = selection
 
-    if incident_choice == "Nodos caídos":
-        await update.message.reply_text("Mostrando nodos caídos...")
-        # Aquí deberías agregar lógica para manejar esta opción específica.
-    elif incident_choice == "Nodos en descarga":
-        await update.message.reply_text("Mostrando nodos en descarga...")
-    elif incident_choice == "Puertas Abiertas":
-        await update.message.reply_text("Mostrando puertas abiertas...")
-    elif incident_choice == "Top 10 Saturación de Agregadores en los últimmos 10 minutos":
-        await update.message.reply_text("Mostrando el top 10 de saturación...")
+    # Notificar al usuario sobre la selección
+    if selection:
+        await update.callback_query.answer()
+        await update.callback_query.message.reply_text(f"Seleccionaste el tipo de incidente: {selection}")
+    else:
+        await update.callback_query.answer()
+        await update.callback_query.message.reply_text("No seleccionaste ningún incidente.")
 
-    # Si deseas volver al menú principal después de procesar la opción
-    return await main_menu(update, context)
+    # Obtener la lista de problemas
+    problems = context.user_data.get('problems', [])
+    auth_token = context.user_data.get('auth_token')
+    eventids = [problem.get("eventid") for problem in problems if problem.get("eventid")]
+    event_details = get_event_details(auth_token, eventids)
+    
+    results = []
+    for event in event_details:
+        host_name = event['hosts'][0]['host'] if 'hosts' in event and len(event['hosts']) > 0 else "Desconocido"
+        department = "No disponible"
+        municipality = "No disponible"
+        problem_name = "No disponible"
+        start_time = "No disponible"
+        opdata = "No disponible"
+        message = ""
+        acknowledges = event.get('acknowledges', [])
+        if acknowledges:
+            # Tomamos el último mensaje de la lista acknowledges
+            last_acknowledge = acknowledges[0]
+            message = last_acknowledge.get('message', "Sin tk")
+
+        if 'tags' in event:
+            for tag in event['tags']:
+                if tag['tag'] == 'Departamento':
+                    department = tag['value']
+                if tag['tag'] == 'Municipio':
+                    municipality = tag['value']
+        
+        opdata = event.get("opdata", "No disponible")
+        problem_name = event.get("name", "No disponible")
+        
+        if problem_name == "Puerta abierta":
+            message = ""
+            
+        if 'clock' in event:
+            start_time = convert_to_colombia_time(event['clock'])
+
+        # Aplicar el filtro de incidente si existe
+        if incident_filter and incident_filter != problem_name:
+            continue
+
+        event_time = convert_to_colombia_time(event['clock']) if 'clock' in event else "No disponible"
+        duration = calculate_duration(event_time) if event_time != "No disponible" else "No disponible"
+        if opdata == "":
+            opdata = "No disponible"
+            
+        # Agregar los datos
+        results.append([start_time, host_name, problem_name, opdata, duration, department, municipality, message])
+
+    if results:
+        # Crear la tabla como imagen
+        img_buf = create_table_image_incidents(results)  # Asegúrate de usar la función adecuada para los incidentes
+        await update.callback_query.answer()
+
+        if update.callback_query.message:
+            await update.callback_query.message.reply_text("Aquí están los resultados filtrados por el incidente seleccionado:")
+            await update.callback_query.message.reply_photo(photo=img_buf)
+            await ask_new_search1(update, context)  # Preguntar si quiere hacer una nueva búsqueda
+            return NEW_SEARCH1
+
+    else:
+        await update.callback_query.answer()
+        if update.callback_query.message:
+            await update.callback_query.message.reply_text("No se encontraron problemas para el incidente seleccionado.")
+            await ask_new_search1(update, context)  # Preguntar si quiere hacer una nueva búsqueda
+            return NEW_SEARCH1
