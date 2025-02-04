@@ -16,7 +16,7 @@ ZABBIX_URL = "http://10.144.2.194/zabbix/api_jsonrpc.php"
 # Función para consultar problemas
 def get_gigabit_problems(auth_token,host_type,tipo,severity):
     if host_type=="Equipos Networking":
-       group=50
+       group=["79", "74", "109","66","67","73","70","81","110"]
     elif host_type=="Clientes":
          group=51
     elif host_type=="Rectificadores":
@@ -51,11 +51,12 @@ def get_gigabit_problems(auth_token,host_type,tipo,severity):
 
     headers = {'Content-Type': 'application/json-rpc'}
     response = requests.post(ZABBIX_URL, json=payload, headers=headers)
-
+    
     if response.status_code == 200:
         try:
             result = response.json().get('result', [])
-            return result
+            filtered_result = [event for event in result if event.get('name') != "Puerta Abierta"]
+            return filtered_result
         except ValueError:
             return []
     else:
@@ -176,9 +177,85 @@ async def start(update: Update, context: CallbackContext):
 
 
 # Función para generar una tabla con matplotlib y devolverla como imagen
-def create_table_image(results):
+import matplotlib.pyplot as plt
+from io import BytesIO
+
+def create_table_image(results, selected_option):
+    # Definir las columnas de la tabla según la opción seleccionada
+    if selected_option == "Nodos caídos":
+     columns = ["Hora de inicio", "Host", "Problema", "Operational data", "Duración", "Departamento", "Municipio", "Tk", "Equipo"]
+    else:
+     columns = ["Hora de inicio", "Host", "Problema", "Operational data", "Duración", "Departamento", "Municipio", "Tk"]
+
+       # Si selected_option no tiene valor, usa el else
+    if not selected_option:
+     columns = ["Hora de inicio", "Host", "Problema", "Operational data", "Duración", "Departamento", "Municipio", "Tk"]
+
+    # Crear los datos para la tabla
+    rows = [list(row) for row in results]
+
+    # Si la opción seleccionada es "Nodos caídos" y hay que añadir la columna "Equipo"
+    if selected_option == "Nodos caídos":
+        for row in rows:
+            # Asignamos un valor para la columna "Equipo" según el Host (o el valor correspondiente)
+            if len(row) == len(columns) - 1:  # Si la fila tiene 8 columnas (sin "Equipo")
+                equipo = "Desconocido"  # Valor por defecto
+                if row[1].startswith('AC'):  # Esto es solo un ejemplo, puedes ajustar la lógica
+                    equipo = "Switch"
+                elif row[1].startswith('GP'):
+                    equipo = "OLT"
+                else:
+                    equipo = "Agregador"
+                row.append(equipo)  # Añadir la columna "Equipo" a la fila
+
+    # Ajustar el tamaño de la figura según el número de filas y el número de columnas
+    fig, ax = plt.subplots(figsize=(len(rows) * 0.15, len(columns) * 0.5))  # Ajusta el tamaño según el número de filas y columnas
+    ax.axis('tight')
+    ax.axis('off')
+
+    # Verificar que las filas tengan el número adecuado de columnas
+    for i, row in enumerate(rows):
+        if len(row) != len(columns):
+            print(f"Advertencia: La fila {i} tiene {len(row)} columnas, pero se esperaban {len(columns)}")
+            # Si la fila tiene menos columnas, agregar valores vacíos
+            while len(row) < len(columns):
+                row.append("")  # Agregar una columna vacía si falta alguna
+            # Si la fila tiene más columnas, truncar las filas
+            if len(row) > len(columns):
+                row = row[:len(columns)]
+            rows[i] = row  # Actualizar la fila
+
+    # Crear la tabla
+    table = ax.table(cellText=rows, colLabels=columns, loc='center', cellLoc='center', colColours=["#f5f5f5"] * len(columns))
+
+    # Ajustar el tamaño de las celdas
+    table.auto_set_font_size(False)
+    table.set_fontsize(8)  # Reducir el tamaño de la fuente para adaptarse mejor
+
+    # Ajustar el ancho de las columnas (puedes cambiar estos valores según el contenido)
+    column_widths = [0.2, 0.2, 0.3, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2] if selected_option == "Nodos caídos" else [0.2, 0.2, 0.3, 0.2, 0.2, 0.2, 0.2, 0.2]
+    for i, width in enumerate(column_widths):
+        table.auto_set_column_width(col=[i])  # Establecer el ancho para cada columna de forma individual
+
+    # Ajustar el espacio entre las celdas y la figura para evitar el corte
+    plt.subplots_adjust(left=0.05, right=0.95, top=0.95, bottom=0.05)
+
+    # Guardar la imagen en un buffer
+    img_buf = BytesIO()
+    plt.savefig(img_buf, format='png', bbox_inches='tight')  # Ajustar la figura de forma ajustada
+    img_buf.seek(0)  # Reiniciar el puntero a la primera posición
+
+    # Cerrar la figura para liberar recursos
+    plt.close(fig)
+
+    return img_buf
+
+
+
+# Función para generar una tabla con matplotlib y devolverla como imagen
+def create_table_image_incidents(results):
     # Definir las columnas de la tabla (en el orden que deseas)
-    columns = ["Hora de inicio", "Host", "Problema","Operational data", "Duración", "Departamento", "Municipio","Tk"]
+    columns = ["Tiempo inicio medida", "Zona", "Host","PLR %", "Departamento", "Municipio"]
 
     # Ajustar el tamaño de la figura según el número de filas y el número de columnas
     fig, ax = plt.subplots(figsize=(len(results) * 0.15, len(columns) * 0.5))  # Ajusta el tamaño según el número de filas y columnas
