@@ -2683,3 +2683,237 @@ Nombre: Interface eth-10gi0/6/0/39(PTKIG165BOGCIT:0/1/0/2):, graphid: 260006
 Nombre: Interface eth-10gi0/6/0/40(PTKIG165BOGCIT:0/1/0/1):, graphid: 260007
 Nombre: Interface eth-10gi0/1/0/4(IG165BOGCIT:0/0/1/6):, graphid: 259973
 la: 260009 gr: 260009
+/home/noc/ChatBot/mainIris.py:29: PTBUserWarning: If 'per_message=False', 'CallbackQueryHandler' will not be tracked for every message. Read this FAQ entry to learn more about the per_* settings: https://github.com/python-telegram-bot/python-telegram-bot/wiki/Frequently-Asked-Questions#what-do-the-per_-settings-in-conversationhandler-do.
+  conv_handler = ConversationHandler(
+/home/noc/ChatBot/bot.py:65: RuntimeWarning: coroutine 'Message.delete' was never awaited
+  update.message.delete()  # Borra el mensaje del usuario que contiene la contraseña
+RuntimeWarning: Enable tracemalloc to get the object allocation traceback
+No error handlers are registered, logging exception.
+Traceback (most recent call last):
+  File "/usr/local/lib/python3.12/site-packages/httpx/_transports/default.py", line 72, in map_httpcore_exceptions
+    yield
+  File "/usr/local/lib/python3.12/site-packages/httpx/_transports/default.py", line 377, in handle_async_request
+    resp = await self._pool.handle_async_request(req)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.12/site-packages/httpcore/_async/connection_pool.py", line 256, in handle_async_request
+    raise exc from None
+  File "/usr/local/lib/python3.12/site-packages/httpcore/_async/connection_pool.py", line 236, in handle_async_request
+    response = await connection.handle_async_request(
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.12/site-packages/httpcore/_async/connection.py", line 101, in handle_async_request
+    raise exc
+  File "/usr/local/lib/python3.12/site-packages/httpcore/_async/connection.py", line 78, in handle_async_request
+    stream = await self._connect(request)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.12/site-packages/httpcore/_async/connection.py", line 124, in _connect
+    stream = await self._network_backend.connect_tcp(**kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.12/site-packages/httpcore/_backends/auto.py", line 31, in connect_tcp
+    return await self._backend.connect_tcp(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.12/site-packages/httpcore/_backends/anyio.py", line 113, in connect_tcp
+    with map_exceptions(exc_map):
+  File "/usr/lib64/python3.12/contextlib.py", line 158, in __exit__
+    self.gen.throw(value)
+  File "/usr/local/lib/python3.12/site-packages/httpcore/_exceptions.py", line 14, in map_exceptions
+    raise to_exc(exc) from exc
+httpcore.ConnectError: All connection attempts failed
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/usr/local/lib/python3.12/site-packages/telegram/request/_httpxrequest.py", line 293, in do_request
+    res = await self._client.request(
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.12/site-packages/httpx/_client.py", line 1585, in request
+    return await self.send(request, auth=auth, follow_redirects=follow_redirects)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.12/site-packages/httpx/_client.py", line 1674, in send
+    response = await self._send_handling_auth(
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.12/site-packages/httpx/_client.py", line 1702, in _send_handling_auth
+    response = await self._send_handling_redirects(
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.12/site-packages/httpx/_client.py", line 1739, in _send_handling_redirects
+    response = await self._send_single_request(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.12/site-packages/httpx/_client.py", line 1776, in _send_single_request
+    response = await transport.handle_async_request(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.12/site-packages/httpx/_transports/default.py", line 376, in handle_async_request
+    with map_httpcore_exceptions():
+  File "/usr/lib64/python3.12/contextlib.py", line 158, in __exit__
+    self.gen.throw(value)
+  File "/usr/local/lib/python3.12/site-packages/httpx/_transports/default.py", line 89, in map_httpcore_exceptions
+    raise mapped_exc(message) from exc
+httpx.ConnectError: All connection attempts failed
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/usr/local/lib/python3.12/site-packages/telegram/ext/_updater.py", line 743, in _network_loop_retry
+    if not await do_action():
+           ^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.12/site-packages/telegram/ext/_updater.py", line 737, in do_action
+    return action_cb_task.result()
+           ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.12/site-packages/telegram/ext/_updater.py", line 367, in polling_action_cb
+    updates = await self.bot.get_updates(
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.12/site-packages/telegram/ext/_extbot.py", line 647, in get_updates
+    updates = await super().get_updates(
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.12/site-packages/telegram/_bot.py", line 4421, in get_updates
+    await self._post(
+  File "/usr/local/lib/python3.12/site-packages/telegram/_bot.py", line 617, in _post
+    return await self._do_post(
+           ^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.12/site-packages/telegram/ext/_extbot.py", line 351, in _do_post
+    return await super()._do_post(
+           ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.12/site-packages/telegram/_bot.py", line 646, in _do_post
+    result = await request.post(
+             ^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.12/site-packages/telegram/request/_baserequest.py", line 202, in post
+    result = await self._request_wrapper(
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.12/site-packages/telegram/request/_baserequest.py", line 334, in _request_wrapper
+    code, payload = await self.do_request(
+                    ^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.12/site-packages/telegram/request/_httpxrequest.py", line 317, in do_request
+    raise NetworkError(f"httpx.{err.__class__.__name__}: {err}") from err
+telegram.error.NetworkError: httpx.ConnectError: All connection attempts failed
+Sin acknowledges en evento 16157503682
+Respuesta de nueva búsqueda: Sí
+Sin acknowledges en evento 18381838454
+Sin acknowledges en evento 18381618330
+Sin acknowledges en evento 18378336622
+Sin acknowledges en evento 18378237790
+Sin acknowledges en evento 18357787030
+Acknowledge sin 'message' en evento 18301318805
+Acknowledge sin 'message' en evento 12895467720
+Advertencia: La fila 0 tiene 9 columnas, pero se esperaban 8
+Advertencia: La fila 1 tiene 9 columnas, pero se esperaban 8
+Advertencia: La fila 2 tiene 9 columnas, pero se esperaban 8
+Advertencia: La fila 3 tiene 9 columnas, pero se esperaban 8
+Advertencia: La fila 4 tiene 9 columnas, pero se esperaban 8
+Advertencia: La fila 5 tiene 9 columnas, pero se esperaban 8
+Advertencia: La fila 6 tiene 9 columnas, pero se esperaban 8
+Advertencia: La fila 7 tiene 9 columnas, pero se esperaban 8
+Advertencia: La fila 8 tiene 9 columnas, pero se esperaban 8
+Advertencia: La fila 9 tiene 9 columnas, pero se esperaban 8
+Advertencia: La fila 10 tiene 9 columnas, pero se esperaban 8
+Advertencia: La fila 11 tiene 9 columnas, pero se esperaban 8
+Advertencia: La fila 12 tiene 9 columnas, pero se esperaban 8
+Respuesta de nueva búsqueda: No
+Sin acknowledges en evento 5243592036
+Sin acknowledges en evento 5243558129
+Sin acknowledges en evento 5243324566
+Advertencia: La fila 0 tiene 9 columnas, pero se esperaban 8
+Advertencia: La fila 1 tiene 9 columnas, pero se esperaban 8
+Advertencia: La fila 2 tiene 9 columnas, pero se esperaban 8
+Advertencia: La fila 3 tiene 9 columnas, pero se esperaban 8
+Advertencia: La fila 4 tiene 9 columnas, pero se esperaban 8
+Advertencia: La fila 5 tiene 9 columnas, pero se esperaban 8
+Advertencia: La fila 6 tiene 9 columnas, pero se esperaban 8
+Advertencia: La fila 7 tiene 9 columnas, pero se esperaban 8
+Advertencia: La fila 8 tiene 9 columnas, pero se esperaban 8
+Advertencia: La fila 9 tiene 9 columnas, pero se esperaban 8
+Advertencia: La fila 10 tiene 9 columnas, pero se esperaban 8
+Advertencia: La fila 11 tiene 9 columnas, pero se esperaban 8
+Advertencia: La fila 12 tiene 9 columnas, pero se esperaban 8
+Respuesta de nueva búsqueda: Sí
+Sin acknowledges en evento 18381838454
+Sin acknowledges en evento 18381618330
+Sin acknowledges en evento 18378336622
+Sin acknowledges en evento 18378237790
+Sin acknowledges en evento 18357787030
+Acknowledge sin 'message' en evento 18301318805
+Acknowledge sin 'message' en evento 12895467720
+Advertencia: La fila 0 tiene 9 columnas, pero se esperaban 8
+Advertencia: La fila 1 tiene 9 columnas, pero se esperaban 8
+Advertencia: La fila 2 tiene 9 columnas, pero se esperaban 8
+Advertencia: La fila 3 tiene 9 columnas, pero se esperaban 8
+Advertencia: La fila 4 tiene 9 columnas, pero se esperaban 8
+Advertencia: La fila 5 tiene 9 columnas, pero se esperaban 8
+Advertencia: La fila 6 tiene 9 columnas, pero se esperaban 8
+Advertencia: La fila 7 tiene 9 columnas, pero se esperaban 8
+Advertencia: La fila 8 tiene 9 columnas, pero se esperaban 8
+Advertencia: La fila 9 tiene 9 columnas, pero se esperaban 8
+Advertencia: La fila 10 tiene 9 columnas, pero se esperaban 8
+Advertencia: La fila 11 tiene 9 columnas, pero se esperaban 8
+Respuesta de nueva búsqueda: Sí
+Sin acknowledges en evento 18381719666
+Sin acknowledges en evento 18381717428
+Sin acknowledges en evento 18381457674
+Sin acknowledges en evento 18381418808
+Sin acknowledges en evento 18381418718
+Sin acknowledges en evento 18381397300
+Sin acknowledges en evento 18381396960
+Sin acknowledges en evento 18381143702
+Sin acknowledges en evento 18379704577
+Sin acknowledges en evento 18379703776
+Sin acknowledges en evento 18378903462
+Sin acknowledges en evento 18378903137
+Sin acknowledges en evento 18378902081
+Sin acknowledges en evento 18373879977
+Sin acknowledges en evento 15020593198
+Respuesta de nueva búsqueda: Sí
+Sin acknowledges en evento 18381719666
+Sin acknowledges en evento 18381717428
+Sin acknowledges en evento 18381457674
+Sin acknowledges en evento 18381418808
+Sin acknowledges en evento 18381418718
+Sin acknowledges en evento 18381397300
+Sin acknowledges en evento 18381396960
+Sin acknowledges en evento 18381143702
+Sin acknowledges en evento 18379704577
+Sin acknowledges en evento 18379703776
+Sin acknowledges en evento 18378903462
+Sin acknowledges en evento 18378903137
+Sin acknowledges en evento 18378902081
+Sin acknowledges en evento 18373879977
+Sin acknowledges en evento 15020593198
+Sin acknowledges en evento 18382962848
+Sin acknowledges en evento 18382961781
+Sin acknowledges en evento 18382882801
+Sin acknowledges en evento 18382515043
+Sin acknowledges en evento 18382279334
+Sin acknowledges en evento 18382263025
+Sin acknowledges en evento 16157503682
+Respuesta de nueva búsqueda: Sí
+Sin acknowledges en evento 18382939238
+Sin acknowledges en evento 18382888066
+Sin acknowledges en evento 18382875330
+Sin acknowledges en evento 18382873538
+Sin acknowledges en evento 18382758862
+Sin acknowledges en evento 18382606155
+Sin acknowledges en evento 18382500559
+Sin acknowledges en evento 18382479309
+Sin acknowledges en evento 18382303137
+Sin acknowledges en evento 18381838454
+Sin acknowledges en evento 18381618330
+Sin acknowledges en evento 18378237790
+Sin acknowledges en evento 18357787030
+Acknowledge sin 'message' en evento 18301318805
+Acknowledge sin 'message' en evento 12895467720
+Advertencia: La fila 0 tiene 9 columnas, pero se esperaban 8
+Advertencia: La fila 1 tiene 9 columnas, pero se esperaban 8
+Advertencia: La fila 2 tiene 9 columnas, pero se esperaban 8
+Advertencia: La fila 3 tiene 9 columnas, pero se esperaban 8
+Advertencia: La fila 4 tiene 9 columnas, pero se esperaban 8
+Advertencia: La fila 5 tiene 9 columnas, pero se esperaban 8
+Advertencia: La fila 6 tiene 9 columnas, pero se esperaban 8
+Advertencia: La fila 7 tiene 9 columnas, pero se esperaban 8
+Advertencia: La fila 8 tiene 9 columnas, pero se esperaban 8
+Advertencia: La fila 9 tiene 9 columnas, pero se esperaban 8
+Advertencia: La fila 10 tiene 9 columnas, pero se esperaban 8
+Advertencia: La fila 11 tiene 9 columnas, pero se esperaban 8
+Advertencia: La fila 12 tiene 9 columnas, pero se esperaban 8
+Advertencia: La fila 13 tiene 9 columnas, pero se esperaban 8
+Advertencia: La fila 14 tiene 9 columnas, pero se esperaban 8
+Advertencia: La fila 15 tiene 9 columnas, pero se esperaban 8
+Advertencia: La fila 16 tiene 9 columnas, pero se esperaban 8
+Advertencia: La fila 17 tiene 9 columnas, pero se esperaban 8
+Sin acknowledges en evento 18386193463
+Sin acknowledges en evento 16157503682

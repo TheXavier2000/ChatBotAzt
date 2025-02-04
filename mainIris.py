@@ -7,7 +7,7 @@ from bot import (
     handle_graph_choice, handle_selected_host, ask_new_search, handle_host_name, 
     handle_new_search, ask_host_type, handle_host_type, stop, menu, main_menu, list_incidents,help, handle_problemas1,handle_selected_equipo,
 
-    handle_search_type, ask_location_name, location_search, show_selected_location,handle_department_selection,handle_new_search1
+    handle_search_type, ask_location_name,process_selection, location_search, show_selected_location,handle_department_selection,handle_new_search1
 )
 from telegram import ReplyKeyboardMarkup
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler, CallbackContext
@@ -18,8 +18,8 @@ from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
     USERNAME, PASSWORD, CHOICE, NEW_SEARCH, HOST_TYPE, HOST_NAME, 
     SELECTED_HOST, GRAPH_CHOICE, GRAPH_CHOICE2, GRAPH_CHOICE3, GRAPH_CHOICE4,  EQUIPO1,
 
-    LOCATION_NAME, SEARCH_TYPE, SHOW_PROBLEMS, SELECTED_LOCATION,SELECTING_DEPARTMENT,NEW_SEARCH1, PROBLEMAS1
-) = range(19)
+    LOCATION_NAME, SEARCH_TYPE, SHOW_PROBLEMS, SELECTED_LOCATION,SELECTING_DEPARTMENT,NEW_SEARCH1, PROBLEMAS1,PROCESS_SELECTION1
+) = range(20)
 
 def main():
     #application = Application.builder().token('7319075472:AAGHNFfervCfH3lt5mblsMoDgjtNQwydlwo').build()#pruebas 
@@ -29,7 +29,7 @@ def main():
     conv_handler = ConversationHandler(
         entry_points=[
             CommandHandler('start', start),
-            CommandHandler('menu', menu),
+            CommandHandler('menu', main_menu),
             CommandHandler('main_menu', main_menu),
             CommandHandler('list_incidents', list_incidents),
             CommandHandler('help', help)
@@ -66,6 +66,7 @@ def main():
                 CallbackQueryHandler(handle_new_search1, pattern='^(Sí|No)$')
             ],
             PROBLEMAS1: [MessageHandler(filters.TEXT & ~filters.COMMAND, handle_problemas1)],  
+            PROCESS_SELECTION1: [MessageHandler(filters.TEXT & ~filters.COMMAND, process_selection)],  
           
         },
         fallbacks=[

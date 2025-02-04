@@ -183,16 +183,16 @@ from io import BytesIO
 def create_table_image(results, selected_option):
     # Definir las columnas de la tabla según la opción seleccionada
     if selected_option == "Nodos caídos":
-     columns = ["Hora de inicio", "Host", "Problema", "Operational data", "Duración", "Departamento", "Municipio", "Tk", "Equipo"]
+     columns = ["Hora de inicio", "Host", "Problema", "Duración", "Departamento", "Municipio", "Tk", "Equipo"]
     else:
-     columns = ["Hora de inicio", "Host", "Problema", "Operational data", "Duración", "Departamento", "Municipio", "Tk"]
+     columns = ["Hora de inicio", "Host", "Problema", "Duración", "Departamento", "Municipio", "Tk"]
 
        # Si selected_option no tiene valor, usa el else
     if not selected_option:
-     columns = ["Hora de inicio", "Host", "Problema", "Operational data", "Duración", "Departamento", "Municipio", "Tk"]
+     columns = ["Hora de inicio", "Host", "Problema", "Duración", "Departamento", "Municipio", "Tk"]
 
     # Crear los datos para la tabla
-    rows = [list(row) for row in results]
+    rows = [row[:3] + row[4:] for row in results]
 
     # Si la opción seleccionada es "Nodos caídos" y hay que añadir la columna "Equipo"
     if selected_option == "Nodos caídos":

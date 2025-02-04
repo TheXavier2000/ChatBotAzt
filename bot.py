@@ -22,11 +22,12 @@ from  dep import  get_event_details
 from  dep import convert_to_colombia_time
 from  dep import calculate_duration
 from  dep import create_table_image
+from  dep import create_table_image_incidents
 (
     USERNAME, PASSWORD, CHOICE, NEW_SEARCH, HOST_TYPE, HOST_NAME, 
     SELECTED_HOST, GRAPH_CHOICE, GRAPH_CHOICE2, GRAPH_CHOICE3, GRAPH_CHOICE4,  EQUIPO1,
-    LOCATION_NAME, SEARCH_TYPE, SHOW_PROBLEMS, SELECTED_LOCATION,SELECTING_DEPARTMENT,NEW_SEARCH1, PROBLEMAS1
-) = range(19)
+    LOCATION_NAME, SEARCH_TYPE, SHOW_PROBLEMS, SELECTED_LOCATION,SELECTING_DEPARTMENT,NEW_SEARCH1, PROBLEMAS1,PROCESS_SELECTION1
+) = range(20)
 
 # Definir los estados de la conversación
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -87,10 +88,10 @@ async def ask_host_type(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
     reply_markup = ReplyKeyboardMarkup(keyboard, one_time_keyboard=True)
  # Comprobamos si la actualización es un mensaje
     if update.message:
-        await update.message.reply_text("¿Cuál es el tipo de host que estás buscando?",reply_markup=reply_markup)
+        await update.message.reply_text("¿Qué consulta deseas realizar?",reply_markup=reply_markup)
     # Si la actualización es una CallbackQuery (probablemente de un botón inline)
     elif update.callback_query:
-        await update.callback_query.message.reply_text("¿Cuál es el tipo de host que estás buscando?",reply_markup=reply_markup)
+        await update.callback_query.message.reply_text("¿Qué consulta deseas realizar?",reply_markup=reply_markup)
         await update.callback_query.answer()  # Confirmamos la acción del botón
     else:
         # Si no hay ni un mensaje ni una CallbackQuery, lo manejamos de alguna manera
@@ -157,7 +158,7 @@ async def handle_choice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
     choice = update.message.text
     context.user_data['choice'] = choice  # Guardar la elección
 
-    if choice not in ["Buscar Problemas", "Buscar gráficas", "Consultar por tipo de equipo", "Consultar incidentes"]:
+    if choice not in ["Buscar Problemas", "Buscar gráficas", "Consultar por tipo de equipo", "Consultar Incidentes (Accesos Rápidos)"]:
         await update.message.reply_text("Consulta no válida, inténtelo de nuevo.")
         return await ask_choice(update, context)  # Volver a preguntar por la opción
 
@@ -173,7 +174,7 @@ async def handle_choice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
         await update.message.reply_text("Has elegido consultar por tipo de equipo.")
         return await ask_host_type(update, context)  # Redirigir al flujo de consulta por tipo de equipo
     
-    elif choice == "Consultar incidentes":
+    elif choice == "Consultar Incidentes (Accesos Rápidos)":
         # Redirigir a la función de incidentes
         return await list_incidents(update, context)
 
@@ -250,6 +251,8 @@ async def problemas(update: Update, context: CallbackContext):
 
     if tipo_problema == "Descarga batería" or tipo_problema == "Voltaje batería" or tipo_problema =="Temperatura rectificador" or tipo_problema =="Temperatura bateria":
         severity=2
+    elif tipo_problema == "Puerta abierta":
+        severity=4   
     else:     
          severity=4   
 
@@ -288,10 +291,11 @@ async def problemas(update: Update, context: CallbackContext):
 async def handle_department_selection(update: Update, context: CallbackContext):
     # Verifica si ya se ha finalizado la conversación o si estamos en una nueva búsqueda
     if context.user_data.get('is_new_search', False):
-        # Si estamos en una nueva búsqueda, no procesamos la selección del departamento
         context.user_data['is_new_search'] = False  # Reseteamos la bandera de nueva búsqueda
         await update.callback_query.answer()
-        return  # Detenemos el flujo de la selección del departamento
+        return  # Detenemos la selección del departamento
+
+    selected_option = context.user_data.get('selected_option')
 
     selection = update.callback_query.data
     department_count = context.user_data.get('department_count', {})
@@ -306,7 +310,7 @@ async def handle_department_selection(update: Update, context: CallbackContext):
 
     # Guardar la selección del usuario
     department_filter = context.user_data.get('department_filter')
-    
+
     # Enviar un mensaje con la selección del departamento
     if department_filter:
         await update.callback_query.answer()
@@ -320,7 +324,7 @@ async def handle_department_selection(update: Update, context: CallbackContext):
     auth_token = context.user_data.get('auth_token')
     eventids = [problem.get("eventid") for problem in problems if problem.get("eventid")]
     event_details = get_event_details(auth_token, eventids)
-    
+
     results = []
     for event in event_details:
         host_name = event['hosts'][0]['host'] if 'hosts' in event and len(event['hosts']) > 0 else "Desconocido"
@@ -329,26 +333,32 @@ async def handle_department_selection(update: Update, context: CallbackContext):
         problem_name = "No disponible"
         start_time = "No disponible"
         opdata = "No disponible"
-        message = ""
+        messages = ""  # Valor predeterminado para 'messages'
         acknowledges = event.get('acknowledges', [])
+        
+        # Verificar y asignar el valor de 'messages' correctamente
         if acknowledges:
-         # Tomamos el último mensaje de la lista acknowledges
-         last_acknowledge = acknowledges[0]
-         message = last_acknowledge.get('message', "Sin tk")
-         
+            last_acknowledge = acknowledges[0]
+            if 'message' in last_acknowledge and last_acknowledge['message']:
+                messages = last_acknowledge['message']
+            else:
+                print(f"Acknowledge sin 'message' en evento {event.get('eventid')}")
+        else:
+            print(f"Sin acknowledges en evento {event.get('eventid')}")
 
+        # Si existen 'tags', obtener el departamento y municipio
         if 'tags' in event:
             for tag in event['tags']:
                 if tag['tag'] == 'Departamento':
                     department = tag['value']
                 if tag['tag'] == 'Municipio':
                     municipality = tag['value']
-        
+
         opdata = event.get("opdata", "No disponible")
         problem_name = event.get("name", "No disponible")
-        
-        if  problem_name =="Puerta abierta":
-            message = ""
+            # Si el nombre del problema es "Puerta abierta", asignar 'messages' a "0"
+        if problem_name == "Puerta abierta":
+            messages = ""
             
         if 'clock' in event:
             start_time = convert_to_colombia_time(event['clock'])
@@ -357,33 +367,54 @@ async def handle_department_selection(update: Update, context: CallbackContext):
         if department_filter and department_filter != department:
             continue
 
+        # Lógica del "Equipo"
+        equipo = "Desconocido"  # Valor por defecto
+        if selected_option == "Nodos caídos":
+            if host_name.startswith("AC") or host_name.startswith("SW"):
+                equipo = "Switch"
+            elif host_name.startswith("GP"):
+                equipo = "OLT"
+            else:
+                equipo = "Agregador"
+
+        # Calcular duración
         event_time = convert_to_colombia_time(event['clock']) if 'clock' in event else "No disponible"
         duration = calculate_duration(event_time) if event_time != "No disponible" else "No disponible"
-        if opdata== "":
-            opdata="No disponible"
-            
-        # Agregar los datos
-        results.append([start_time, host_name, problem_name,opdata, duration, department, municipality,message])
+        if opdata == "":
+            opdata = "No disponible"
+
+        # Agregar los datos, incluyendo la nueva columna "Equipo"
+        results.append([start_time, host_name, problem_name, opdata, duration, department, municipality, messages, equipo])
 
     if results:
+        # Ordenar los resultados:
+        # 1. Primero por tipo de equipo (Switch, OLT, Agregador)
+        # 2. Luego por la fecha de inicio (start_time) de forma descendente
+        equipo_order = {'Switch': 4, 'OLT': 3, 'Agregador': 2, 'Desconocido': 1}
+        results.sort(key=lambda x: (equipo_order.get(x[8], 4), x[0]), reverse=True)
+
         # Crear la tabla como imagen
-        img_buf = create_table_image(results)
+        img_buf = create_table_image(results, selected_option)
         await update.callback_query.answer()
 
         if update.callback_query.message:
             await update.callback_query.message.reply_text("Aquí están los resultados filtrados:")
             await update.callback_query.message.reply_photo(photo=img_buf)
             await ask_new_search1(update, context)  # Preguntar si quiere hacer una nueva búsqueda
-            return NEW_SEARCH1 
+            return NEW_SEARCH1
 
     else:
         await update.callback_query.answer()
         if update.callback_query.message:
             await update.callback_query.message.reply_text("No se encontraron problemas para mostrar.")
             await ask_new_search1(update, context)  # Preguntar si quiere hacer una nueva búsqueda
-            return NEW_SEARCH1 
- 
-     
+            return NEW_SEARCH1
+
+
+
+
+
+
 async def ask_graph_choice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     host_type = context.user_data.get('host_type')
     
@@ -804,7 +835,7 @@ async def ask_new_search(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
 async def handle_new_search(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     answer = update.message.text
     if answer == "Sí":
-        return await ask_host_type(update, context)  # Regresar a preguntar por la opción
+        return await main_menu(update, context)  # Regresar a preguntar por la opción
     elif answer == "No":
         await update.message.reply_text("Gracias por usar el bot. La conversación ha finalizado.")
         return ConversationHandler.END  # Termina la conversación
@@ -869,7 +900,7 @@ async def handle_new_search1(update: Update, context: CallbackContext) -> int:
 
     if answer == "Sí":
         #await update.callback_query.answer()
-        return await ask_host_type(update, context)# Volver a llamar la función que busca problemas
+        return await main_menu(update, context)# Volver a llamar la función que busca problemas
         
 
     elif answer == "No":
@@ -885,53 +916,77 @@ async def handle_new_search1(update: Update, context: CallbackContext) -> int:
 
 # Función del menú principal
 async def main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    keyboard = [["Consultar incidentes", "Consultar por tipo de equipo"]]
+    selected_option = None  # La opción seleccionada por el usuario
+    context.user_data['selected_option'] = selected_option
+    keyboard = [["Consultar Incidentes (Accesos Rápidos)", "Consultar por tipo de equipo"]]
     reply_markup = ReplyKeyboardMarkup(keyboard, one_time_keyboard=True)
+    # Comprobamos si la actualización es un mensaje
+    if update.message:
+        await update.message.reply_text("¿Qué consulta deseas realizar?",reply_markup=reply_markup)
+    # Si la actualización es una CallbackQuery (probablemente de un botón inline)
+    elif update.callback_query:
+        await update.callback_query.message.reply_text("¿Qué consulta deseas realizar?",reply_markup=reply_markup)
+        await update.callback_query.answer()  # Confirmamos la acción del botón
+    else:
+        # Si no hay ni un mensaje ni una CallbackQuery, lo manejamos de alguna manera
+        await update.effective_chat.send_message("Error: No se puede manejar la actualización.")
 
-    await update.message.reply_text(
-        "¿Qué deseas hacer?\n\n (Si en algún momento tienes dudas de los comandos usa /help)\n\n",
-        reply_markup=reply_markup
-    )
+     #await update.message.reply_text(
+      #  "¿Qué tipo deseas buscar? (Si tienes dudas sobre los comandos usa /help)\n\n",
+     #   reply_markup=reply_markup
+     #)
     return CHOICE  # Cambia al estado de manejo de elección
 
-# 12. Manejar la función del menu principal
 async def list_incidents(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Maneja el comando /menu para regresar al menú principal."""
-    keyboard = [["Nodos caídos", "Nodos en descarga", "Puertas Abiertas", "Top 10 Saturación de Agregadores en los últimmos 10 minutos"]]
-    reply_markup = ReplyKeyboardMarkup(keyboard, one_time_keyboard=True)
 
+    
+    # Crear el teclado de opciones
+    keyboard = [["Nodos caídos", "Nodos en descarga", "Puertas Abiertas"]]
+    reply_markup = ReplyKeyboardMarkup(keyboard, one_time_keyboard=True)
+    
+    # Enviar mensaje con las opciones
     await update.message.reply_text(
         "Seleccione la opción a consultar\n\n (Si en algún momento tienes dudas de los comandos usa /help)\n\n",
         reply_markup=reply_markup
     )
-    return HOST_TYPE  # Cambia al estado de tipo de host
+    return PROCESS_SELECTION1
 
-# Función para manejar los diferentes incidentes a consultar
-async def handle_incident_selection(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Maneja la selección de una opción de incidentes."""
-    incident_choice = update.message.text
+# Handler para procesar la respuesta seleccionada
+async def process_selection(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Procesa la opción seleccionada por el usuario."""
+    selected_option = update.message.text  # La opción seleccionada por el usuario
+    context.user_data['selected_option'] = selected_option
+   
+    if selected_option == "Nodos caídos":
+        host_type ="Equipos Networking"
+        context.user_data['host_type'] = host_type
+        auth_token = context.user_data.get('auth_token')
+        await update.message.reply_text("Buscando problemas, por favor espere...")
+        return await problemas(update, context)
+    
+    elif selected_option == "Nodos en descarga":
+         host_type = "Rectificadores"
+         context.user_data['host_type'] = host_type
+         tipo_problema ="Voltaje batería"
+         context.user_data['tipo_problema'] = tipo_problema 
+         auth_token = context.user_data.get('auth_token')
+         await update.message.reply_text("Buscando problemas, por favor espere...")
+         return await problemas(update, context)
+    elif selected_option == "Puertas Abiertas":
+         host_type = "Rectificadores"
+         context.user_data['host_type'] = host_type
+         tipo_problema ="Puerta abierta"
+         context.user_data['tipo_problema'] = tipo_problema 
+         auth_token = context.user_data.get('auth_token')
+         await update.message.reply_text("Buscando problemas, por favor espere...")
+         return await problemas(update, context)
 
-    # Opciones válidas para incidentes
-    valid_incidents = [
-        "Nodos caídos", 
-        "Nodos en descarga", 
-        "Puertas Abiertas", 
-        "Top 10 Saturación de Agregadores en los últimmos 10 minutos"
-    ]
+    elif selected_option == "Top 10 Saturación de Agregadores en los últimos 10 minutos":
+        # Lógica para "Top 10 Saturación"
+        pass
+   
 
-    if incident_choice not in valid_incidents:
-        await update.message.reply_text("Opción no válida, por favor seleccione una opción del teclado.")
-        return HOST_TYPE  # Volver a las opciones de incidentes
+    else:
+        # Si la selección no es válida
+        await update.message.reply_text("Opción no válida, por favor selecciona una opción del menú.")
 
-    if incident_choice == "Nodos caídos":
-        await update.message.reply_text("Mostrando nodos caídos...")
-        # Aquí deberías agregar lógica para manejar esta opción específica.
-    elif incident_choice == "Nodos en descarga":
-        await update.message.reply_text("Mostrando nodos en descarga...")
-    elif incident_choice == "Puertas Abiertas":
-        await update.message.reply_text("Mostrando puertas abiertas...")
-    elif incident_choice == "Top 10 Saturación de Agregadores en los últimmos 10 minutos":
-        await update.message.reply_text("Mostrando el top 10 de saturación...")
-
-    # Si deseas volver al menú principal después de procesar la opción
-    return await main_menu(update, context)
