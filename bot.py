@@ -1,5 +1,6 @@
-from telegram import Update, ForceReply, ReplyKeyboardMarkup, KeyboardButton, ReplyKeyboardRemove, InlineKeyboardMarkup, InlineKeyboardButton
+from telegram import Update, ForceReply, ReplyKeyboardMarkup, KeyboardButton, ReplyKeyboardRemove, InlineKeyboardMarkup, InlineKeyboardButton, Message
 from telegram.ext import ContextTypes, ConversationHandler
+from telegram.constants import ParseMode
 from auth import zabbix_login
 from search import search_host_by_name
 from problems import get_problems
@@ -12,7 +13,7 @@ from problems import get_problems_by_hosts
 from problems import get_inter_cliente
 from problems import generate_graph_url
 from problems import download_image
-import requests
+import requests, re, asyncio
 from telegram.ext import CallbackContext
 from telegram import ForceReply
 import json
@@ -53,33 +54,40 @@ async def handle_username(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
 
 # 1. Función de autenticación exitosa
 async def handle_password(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    
-    password = update.message.text  # Aquí obtenemos la contraseña del usuario
-    
-    # Obtener el ID único del mensaje (el que contiene la contraseña)
-    message_id = update.message.message_id  # ID del mensaje que contiene la contraseña
-   
-    
-    try:
-        # Eliminar el mensaje con la contraseña usando el ID único
-        update.message.delete()  # Borra el mensaje del usuario que contiene la contraseña
-       
-    except Exception as e:
-        print(f"Error al borrar el mensaje: {e}")
+    """Captura la contraseña, la elimina del chat y la muestra con el efecto de spoiler."""
+
+    password = update.message.text  # Obtiene la contraseña del usuario
     username = context.user_data.get('username')
-    
+
+    # Escapar caracteres especiales para Markdown V2
+    escaped_password = re.sub(r'([\.\(\)\-\+\=\#\!\{\}\[\]\*\_\~\|\>\<\\])', r'\\\1', password)
+
     try:
-        # Intentar la autenticación
+        # Aplicar spoiler a la contraseña
+        masked_password = f"||{escaped_password}||"
+
+        # Eliminar el mensaje original con la contraseña
+        await update.message.delete()
+
+        # Enviar el mensaje con la contraseña oculta (con spoiler)
+        await update.message.reply_text(
+            f"Tu contraseña: {masked_password}",
+            parse_mode=ParseMode.MARKDOWN_V2
+        )
+
+        # Intentar autenticación
         auth_token = await zabbix_login(username, password)  # Llama a la función de autenticación
-        await update.message.reply_text("Autenticación exitosa. ¡Bienvenido!")
         context.user_data['auth_token'] = auth_token  # Guardar el token de autenticación
 
+        await update.message.reply_text("Autenticación exitosa. ¡Bienvenido! ✅")
+
         # Primero preguntar por el tipo de host, luego la opción de búsqueda
-        return await main_menu(update, context) # tipo de host
+        return await main_menu(update, context)
 
     except Exception as e:
         await update.message.reply_text(f"Error: {str(e)}. La conversación se ha terminado.")
         return await stop(update, context)  # Termina la conversación
+
 
 # 2. Función para preguntar por el tipo de host
 async def ask_host_type(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
