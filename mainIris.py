@@ -25,24 +25,14 @@ from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 ) = range(20)
 
 
-async def set_bot_commands(application):
-    commands = [
-        BotCommand("start", "Iniciar el bot"),
-        BotCommand("menu", "Mostrar el menú principal"),
-        BotCommand("device_group", "Mostrar los grupos de equipos a consultar"),
-        #BotCommand("list_incidents", "Listar incidentes"),
-        BotCommand("help", "Obtener ayuda"),
-        BotCommand("stop", "Finalizar la conversación"),
-    ]
-    await application.bot.set_my_commands(commands)
+
 
 
 def main():
     #application = Application.builder().token('7319075472:AAGHNFfervCfH3lt5mblsMoDgjtNQwydlwo').build()#pruebas 
     application = Application.builder().token('7254640619:AAE_r6W7ajo5nb4lHLZWBLpT8h2MmQqHkMc').build() #principal
     
-    loop = asyncio.get_event_loop()
-    loop.run_until_complete(set_bot_commands(application))  # Ejecutar la tarea asíncrona
+
 
     # Definir el manejador de la conversación
     conv_handler = ConversationHandler(

@@ -1,4 +1,4 @@
-from telegram import Update, ForceReply, ReplyKeyboardMarkup, KeyboardButton, ReplyKeyboardRemove, InlineKeyboardMarkup, InlineKeyboardButton, Message
+from telegram import Update, ForceReply, ReplyKeyboardMarkup, KeyboardButton, ReplyKeyboardRemove, InlineKeyboardMarkup, InlineKeyboardButton, Message, BotCommand
 from telegram.ext import ContextTypes, ConversationHandler
 from telegram.constants import ParseMode
 from auth import zabbix_login
@@ -24,32 +24,49 @@ from  dep import convert_to_colombia_time
 from  dep import calculate_duration
 from  dep import create_table_image
 from  dep import create_table_image_incidents
+#from mainIris import set_bot_commands
 (
     USERNAME, PASSWORD, CHOICE, NEW_SEARCH, HOST_TYPE, HOST_NAME, 
     SELECTED_HOST, GRAPH_CHOICE, GRAPH_CHOICE2, GRAPH_CHOICE3, GRAPH_CHOICE4,  EQUIPO1,
     LOCATION_NAME, SEARCH_TYPE, SHOW_PROBLEMS, SELECTED_LOCATION,SELECTING_DEPARTMENT,NEW_SEARCH1, PROBLEMAS1,PROCESS_SELECTION1
 ) = range(20)
 
-# Definir los estados de la conversación
+from telegram import ForceReply, Update, BotCommand
+from telegram.ext import ContextTypes
+
+# Función de inicio
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     user = update.effective_user
+    
+    # Respuesta inicial al usuario
     await update.message.reply_text(
         f"¡Hola {user.first_name}! Soy 👁Iris👁 tu asistente para consultas de datos sobre hosts. 🖥️\n\n"
         "Conmigo, puedes:\n\n"
         "📊 Generar gráficas sobre el rendimiento de tus equipos.\n"
         "🔍 Consultar información detallada sobre hosts específicos.\n"
         "⚠️ Identificar y analizar problemas detectados.\n\n"
-        "Para comenzar a usar el Bot por favor ingresa tu nombre de usuario ¡Estoy listo para ayudarte! ✅"
+        "¡Estoy listo para ayudarte! 😎✌✅"
     )
-    reply_markup=ForceReply(selective=True),
+    
+    # Mostrar solo los comandos /start y /stop
+    await set_bot_commands(context.application, start_menu=True)
+
+    # Responder con un ForceReply para pedir el nombre de usuario
+    reply_markup = ForceReply(selective=True)
+    await update.message.reply_text("Por favor, ingresa tu nombre de usuario:", reply_markup=reply_markup)
+
     return USERNAME
+
 
 async def handle_username(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     username = update.message.text
     context.user_data['username'] = username  # Guardar el nombre de usuario
 
     await update.message.reply_text("Por favor ingresa tu contraseña en zabbix.",reply_markup=ForceReply(selective=True))
-
+    
+    # Mostrar solo los comandos /start y /stop
+    await set_bot_commands(context.application, start_menu=True)
+    
     return PASSWORD
 
 # 1. Función de autenticación exitosa
@@ -58,6 +75,9 @@ async def handle_password(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
 
     password = update.message.text  # Obtiene la contraseña del usuario
     username = context.user_data.get('username')
+
+    # Mostrar solo los comandos /start y /stop
+    await set_bot_commands(context.application, start_menu=True)
 
     # Escapar caracteres especiales para Markdown V2
     escaped_password = re.sub(r'([\.\(\)\-\+\=\#\!\{\}\[\]\*\_\~\|\>\<\\])', r'\\\1', password)
@@ -87,11 +107,14 @@ async def handle_password(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     except Exception as e:
         await update.message.reply_text(f"Error: {str(e)}. La conversación se ha terminado.")
         return await stop(update, context)  # Termina la conversación
+    
+    
+
 
 
 # 2. Función para preguntar por el tipo de host
 async def ask_host_type(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    
+    await set_bot_commands(context.application, start_menu=False)
     keyboard = [["Equipos Networking", "Clientes", "Rectificadores","Plantas"]]
     reply_markup = ReplyKeyboardMarkup(keyboard, one_time_keyboard=True)
  # Comprobamos si la actualización es un mensaje
@@ -113,6 +136,7 @@ async def ask_host_type(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
 
 # 3. Manejo de la respuesta sobre el tipo de host
 async def handle_host_type(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    await set_bot_commands(context.application, start_menu=False)
     host_type = update.message.text
     context.user_data['host_type'] = host_type  # Guardar el tipo de host seleccionado
 
@@ -137,6 +161,7 @@ async def handle_host_type(update: Update, context: ContextTypes.DEFAULT_TYPE) -
        return await ask_choice(update, context)  # Ahora se pregunta por la opción de búsqueda (Buscar host o Buscar gráficas)
     
 async def handle_selected_equipo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    await set_bot_commands(context.application, start_menu=False)
     host_type = update.message.text
     context.user_data['host_type'] = host_type  # Guardar el tipo de host seleccionado
 
@@ -152,6 +177,7 @@ async def handle_selected_equipo(update: Update, context: ContextTypes.DEFAULT_T
     
 # 4. Función para preguntar por la opción de búsqueda
 async def ask_choice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    await set_bot_commands(context.application, start_menu=False)
     keyboard = [["Buscar Problemas", "Buscar gráficas"]]
     reply_markup = ReplyKeyboardMarkup(keyboard, one_time_keyboard=True)
 
@@ -163,6 +189,7 @@ async def ask_choice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
 
 # 5. Manejo de la elección de "Buscar host" o "Buscar gráficas"
 async def handle_choice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    await set_bot_commands(context.application, start_menu=False)
     choice = update.message.text
     context.user_data['choice'] = choice  # Guardar la elección
 
@@ -188,6 +215,7 @@ async def handle_choice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
 
 # Pregunta el tipo de problema a seleccionar (Host o Locación)
 async def ask_search_type(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    await set_bot_commands(context.application, start_menu=False)
     keyboard = [["Por Host", "Por Locación"]]  # Opciones para elegir
     reply_markup = ReplyKeyboardMarkup(keyboard, one_time_keyboard=True)
 
@@ -199,6 +227,7 @@ async def ask_search_type(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
 
 # Manejo de la selección de búsqueda (Por Host o Por Locación)
 async def handle_search_type(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    await set_bot_commands(context.application, start_menu=False)
     search_type = update.message.text.strip().lower()  # Normalizar la entrada
     context.user_data['search_type'] = search_type  # Guardar el tipo de búsqueda
 
@@ -213,6 +242,7 @@ async def handle_search_type(update: Update, context: ContextTypes.DEFAULT_TYPE)
     return await ask_search_type(update, context)  # Volver a preguntar
 
 async def ask_location_name(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    await set_bot_commands(context.application, start_menu=False)
     # Solicitar al usuario que ingrese el nombre del departamento o municipio
     host_type = context.user_data.get('host_type') 
     if host_type == "Rectificadores":
@@ -235,7 +265,7 @@ async def ask_location_name(update: Update, context: ContextTypes.DEFAULT_TYPE) 
          return await problemas(update, context)
 
 async def handle_problemas1(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    
+    await set_bot_commands(context.application, start_menu=False)
     tipo_problema = update.message.text
     context.user_data['tipo_problema'] = tipo_problema  # Guardar la elección 
     host_type = context.user_data.get('host_type')  # Recuperar el tipo de host
@@ -249,6 +279,7 @@ async def handle_problemas1(update: Update, context: ContextTypes.DEFAULT_TYPE) 
          return await problemas(update, context)
 
 async def problemas(update: Update, context: CallbackContext):
+    await set_bot_commands(context.application, start_menu=False)
     host_type = context.user_data.get('host_type')  # Recuperar el tipo de host
     auth_token = context.user_data.get('auth_token')
     tipo_problema = context.user_data.get('tipo_problema')
@@ -297,6 +328,7 @@ async def problemas(update: Update, context: CallbackContext):
 
      
 async def handle_department_selection(update: Update, context: CallbackContext):
+    await set_bot_commands(context.application, start_menu=False)
     # Verifica si ya se ha finalizado la conversación o si estamos en una nueva búsqueda
     if context.user_data.get('is_new_search', False):
         context.user_data['is_new_search'] = False  # Reseteamos la bandera de nueva búsqueda
@@ -424,6 +456,7 @@ async def handle_department_selection(update: Update, context: CallbackContext):
 
 
 async def ask_graph_choice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    await set_bot_commands(context.application, start_menu=False)
     host_type = context.user_data.get('host_type')
     
     
@@ -468,6 +501,7 @@ async def ask_graph_choice(update: Update, context: ContextTypes.DEFAULT_TYPE) -
             return GRAPH_CHOICE # Redirigimos al estado para la selección de gráficos 
      
 async def ask_graph_choice2(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    await set_bot_commands(context.application, start_menu=False)
            # Preguntar por el tipo de gráfica para Rectificadores
     keyboard = [["Interface Eth", "Interface Gigabit","LAG"]]
     reply_markup = ReplyKeyboardMarkup(keyboard, one_time_keyboard=True)
@@ -478,6 +512,7 @@ async def ask_graph_choice2(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     return GRAPH_CHOICE2 # Redirigimos al estado para la selección de gráficos 
 # 8. Manejo de la selección del tipo de gráfica
 async def handle_graph_choice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    await set_bot_commands(context.application, start_menu=False)
     graph_choice = update.message.text
     graph_choice2 = update.message.text
     context.user_data['graph_choice'] = graph_choice  # Guardar la elección de gráfica
@@ -502,6 +537,7 @@ async def handle_graph_choice(update: Update, context: ContextTypes.DEFAULT_TYPE
 
 # 8. Manejo de la selección del tipo de gráfica
 async def handle_graph_choice2(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    await set_bot_commands(context.application, start_menu=False)
     graph_choice2 = update.message.text
     context.user_data['graph_choice2'] = graph_choice2  # Guardar la elección de gráfica
     host_type = context.user_data.get('host_type')  # Recuperar el tipo de host
@@ -529,6 +565,7 @@ async def handle_graph_choice2(update: Update, context: ContextTypes.DEFAULT_TYP
 
 # Función para manejar la búsqueda de problemas por ubicación
 async def location_search(update, context):
+    await set_bot_commands(context.application, start_menu=False)
     location_name = update.message.text.strip()  # Nombre del municipio o departamento
     
     if location_name:
@@ -568,6 +605,7 @@ async def location_search(update, context):
 
 # Función para manejar la respuesta de los botones (Sí o No)
 async def handle_new_search_choice(update, context):
+    await set_bot_commands(context.application, start_menu=False)
     choice = update.message.text.strip()
 
     if choice == "Sí":
@@ -582,6 +620,7 @@ async def handle_new_search_choice(update, context):
 
 
 async def show_selected_location(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    await set_bot_commands(context.application, start_menu=False)
     location = update.message.text.strip()  # Obtener la ubicación seleccionada
 
     # Verificar si la ubicación está en las sugerencias almacenadas
@@ -607,11 +646,13 @@ async def show_selected_location(update: Update, context: ContextTypes.DEFAULT_T
 
 # 6. Función para preguntar el nombre del host
 async def ask_host_name(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    await set_bot_commands(context.application, start_menu=False)
     await update.message.reply_text("Por favor, ingresa el nombre o el nemónico del equipo que deseas consultar.")
     return HOST_NAME  # Cambia al estado para ingresar el nombre del host
 
 # 7. Manejo del nombre del host y búsqueda
 async def handle_host_name(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    await set_bot_commands(context.application, start_menu=False)
     host_name = update.message.text
     auth_token = context.user_data.get('auth_token')
     host_type = context.user_data.get('host_type')  # Obtén el tipo de host
@@ -636,6 +677,7 @@ async def handle_host_name(update: Update, context: ContextTypes.DEFAULT_TYPE) -
 
 # 8. Manejo de la selección del host
 async def handle_selected_host(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    await set_bot_commands(context.application, start_menu=False)
     choice = context.user_data.get('choice')
     selected_host = update.message.text
     hosts = context.user_data.get('hosts', [])
@@ -774,6 +816,7 @@ async def ask_interfaces(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
 
 
 async def handle_interface_selection(update: Update, context: CallbackContext) -> int:
+    await set_bot_commands(context.application, start_menu=False)
     inter = context.user_data.get('inter', [])
     
     selected_interface = update.message.text  # El nombre de la interfaz seleccionada por el usuario
@@ -814,6 +857,7 @@ async def handle_interface_selection(update: Update, context: CallbackContext) -
 
     
 async def process_graphs(update: Update, context: CallbackContext, graphs):
+    await set_bot_commands(context.application, start_menu=False)
     if not graphs:
         await update.message.reply_text("No se encontraron gráficas para mostrar.")
         return
@@ -831,6 +875,7 @@ async def process_graphs(update: Update, context: CallbackContext, graphs):
 
 # 10. Preguntar por una nueva búsqueda
 async def ask_new_search(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    await set_bot_commands(context.application, start_menu=False)
     keyboard = [["Sí", "No"]]
     reply_markup = ReplyKeyboardMarkup(keyboard, one_time_keyboard=True)
 
@@ -841,6 +886,7 @@ async def ask_new_search(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
 
 # 11. Manejar la respuesta sobre si hacer una nueva búsqueda
 async def handle_new_search(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    await set_bot_commands(context.application, start_menu=False)
     answer = update.message.text
     if answer == "Sí":
         return await menu(update, context)  # Regresar a preguntar por la opción
@@ -852,8 +898,19 @@ async def handle_new_search(update: Update, context: ContextTypes.DEFAULT_TYPE) 
         await ask_new_search(update, context)
         return NEW_SEARCH  # Permitir elegir de nuevo
 
-async def stop (update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    await update.message.reply_text("La conversación ha sido detenida.")
+async def stop(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    # Cambiar el menú para que solo muestre /start y /stop
+    await set_bot_commands(context.application, start_menu=True)
+
+    # Enviar un mensaje y eliminar los botones en pantalla
+    await update.message.reply_text(
+        "La conversación ha sido detenida. Puedes reiniciar con /start.",
+        reply_markup=ReplyKeyboardRemove()  # Oculta cualquier teclado en pantalla
+    )
+
+    # Limpiar el contexto del usuario
+    context.user_data.clear()
+
     return ConversationHandler.END
 
 # 12. Manejar la función del device_group
@@ -870,6 +927,7 @@ async def device_group(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
 
 # 12. Manejar la función del help
 async def help(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    await set_bot_commands(context.application, start_menu=False)
     user = update.effective_user
     help_message = (
          f"¡Hola {user.first_name}. Aquí están los comandos que puedes usar:\n\n"
@@ -889,6 +947,7 @@ async def help(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     await update.message.reply_text(help_message)
 
 async def ask_new_search1(update: Update, context: CallbackContext) -> None:
+    await set_bot_commands(context.application, start_menu=False)
     keyboard = [
         [InlineKeyboardButton("Sí", callback_data="Sí")],
         [InlineKeyboardButton("No", callback_data="No")]
@@ -904,6 +963,7 @@ async def ask_new_search1(update: Update, context: CallbackContext) -> None:
 
 # Función para procesar la respuesta del usuario para nueva búsqueda
 async def handle_new_search1(update: Update, context: CallbackContext) -> int:
+    await set_bot_commands(context.application, start_menu=False)
     answer = update.callback_query.data  # Obtén la respuesta desde callback_data
     print(f"Respuesta de nueva búsqueda: {answer}")
 
@@ -925,6 +985,7 @@ async def handle_new_search1(update: Update, context: CallbackContext) -> int:
 
 # Función del menú principal
 async def menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    await set_bot_commands(context.application, start_menu=False)
     selected_option = None  # La opción seleccionada por el usuario
     context.user_data['selected_option'] = selected_option
     keyboard = [["Consultar Incidentes (Accesos Rápidos)", "Consultar por tipo de equipo"]]
@@ -947,7 +1008,7 @@ async def menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     return CHOICE  # Cambia al estado de manejo de elección
 
 async def list_incidents(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-
+    await set_bot_commands(context.application, start_menu=False)
     
     # Crear el teclado de opciones
     keyboard = [["Nodos caídos", "Nodos en descarga", "Puertas Abiertas"]]
@@ -962,6 +1023,7 @@ async def list_incidents(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
 
 # Handler para procesar la respuesta seleccionada
 async def process_selection(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await set_bot_commands(context.application, start_menu=False)
     """Procesa la opción seleccionada por el usuario."""
     selected_option = update.message.text  # La opción seleccionada por el usuario
     context.user_data['selected_option'] = selected_option
@@ -999,3 +1061,23 @@ async def process_selection(update: Update, context: ContextTypes.DEFAULT_TYPE):
         # Si la selección no es válida
         await update.message.reply_text("Opción no válida, por favor selecciona una opción del menú.")
 
+async def set_bot_commands(application, start_menu=False):
+    if start_menu:
+        # Solo mostrar /start y /stop si el usuario está en el inicio
+        commands = [
+            BotCommand("start", "Iniciar el bot"),
+            BotCommand("stop", "Finalizar la conversación"),
+        ]
+    else:
+        # Mostrar todos los comandos cuando el usuario accede a otro menú
+        commands = [
+            BotCommand("start", "Iniciar el bot"),
+            BotCommand("menu", "Mostrar el menú principal"),
+            BotCommand("device_group", "Mostrar los grupos de equipos a consultar"),
+            # BotCommand("list_incidents", "Listar incidentes"),
+            BotCommand("help", "Obtener ayuda"),
+            BotCommand("stop", "Finalizar la conversación"),
+        ]
+    
+    # Establecer los comandos en el bot
+    await application.bot.set_my_commands(commands)
