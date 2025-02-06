@@ -1,11 +1,14 @@
-from telegram.ext import Application, CommandHandler, MessageHandler, filters, ConversationHandler
+from telegram.ext import Application, CommandHandler, MessageHandler, filters, ConversationHandler, ApplicationBuilder
 from auth import zabbix_login
+from telegram import BotCommand
+import asyncio
+
 
 from bot import (
     start, handle_username, ask_interfaces, handle_interface_selection,
     handle_password, handle_graph_choice2, ask_choice, handle_choice, 
     handle_graph_choice, handle_selected_host, ask_new_search, handle_host_name, 
-    handle_new_search, ask_host_type, handle_host_type, stop, menu, main_menu, list_incidents,help, handle_problemas1,handle_selected_equipo,
+    handle_new_search, ask_host_type, handle_host_type, stop, device_group, menu, list_incidents,help, handle_problemas1,handle_selected_equipo,
 
     handle_search_type, ask_location_name,process_selection, location_search, show_selected_location,handle_department_selection,handle_new_search1
 )
@@ -21,17 +24,33 @@ from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
     LOCATION_NAME, SEARCH_TYPE, SHOW_PROBLEMS, SELECTED_LOCATION,SELECTING_DEPARTMENT,NEW_SEARCH1, PROBLEMAS1,PROCESS_SELECTION1
 ) = range(20)
 
+
+async def set_bot_commands(application):
+    commands = [
+        BotCommand("start", "Iniciar el bot"),
+        BotCommand("menu", "Mostrar el menú principal"),
+        BotCommand("device_group", "Mostrar los grupos de equipos a consultar"),
+        #BotCommand("list_incidents", "Listar incidentes"),
+        BotCommand("help", "Obtener ayuda"),
+        BotCommand("stop", "Finalizar la conversación"),
+    ]
+    await application.bot.set_my_commands(commands)
+
+
 def main():
     #application = Application.builder().token('7319075472:AAGHNFfervCfH3lt5mblsMoDgjtNQwydlwo').build()#pruebas 
     application = Application.builder().token('7254640619:AAE_r6W7ajo5nb4lHLZWBLpT8h2MmQqHkMc').build() #principal
+    
+    loop = asyncio.get_event_loop()
+    loop.run_until_complete(set_bot_commands(application))  # Ejecutar la tarea asíncrona
 
     # Definir el manejador de la conversación
     conv_handler = ConversationHandler(
         entry_points=[
             CommandHandler('start', start),
-            CommandHandler('menu', main_menu),
-            CommandHandler('main_menu', main_menu),
-            CommandHandler('list_incidents', list_incidents),
+            CommandHandler('menu', menu),
+            CommandHandler('device_group', device_group),
+        #    CommandHandler('list_incidents', list_incidents),
             CommandHandler('help', help)
         ],
         states={
@@ -71,9 +90,9 @@ def main():
         },
         fallbacks=[
             CommandHandler('stop', stop),
+            CommandHandler('device_group', device_group),
             CommandHandler('menu', menu),
-            CommandHandler('main_menu', main_menu),
-            CommandHandler('list_incidents', list_incidents),
+        #    CommandHandler('list_incidents', list_incidents),
             CommandHandler('help', help)
         ],
     )

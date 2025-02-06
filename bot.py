@@ -82,7 +82,7 @@ async def handle_password(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         await update.message.reply_text("Autenticación exitosa. ¡Bienvenido! ✅")
 
         # Primero preguntar por el tipo de host, luego la opción de búsqueda
-        return await main_menu(update, context)
+        return await menu(update, context)
 
     except Exception as e:
         await update.message.reply_text(f"Error: {str(e)}. La conversación se ha terminado.")
@@ -843,7 +843,7 @@ async def ask_new_search(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
 async def handle_new_search(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     answer = update.message.text
     if answer == "Sí":
-        return await main_menu(update, context)  # Regresar a preguntar por la opción
+        return await menu(update, context)  # Regresar a preguntar por la opción
     elif answer == "No":
         await update.message.reply_text("Gracias por usar el bot. La conversación ha finalizado.")
         return ConversationHandler.END  # Termina la conversación
@@ -856,9 +856,9 @@ async def stop (update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     await update.message.reply_text("La conversación ha sido detenida.")
     return ConversationHandler.END
 
-# 12. Manejar la función del menu
-async def menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Maneja el comando /menu para regresar al menú principal."""
+# 12. Manejar la función del device_group
+async def device_group(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Maneja el comando /device_group para regresar al menú principal."""
     keyboard = [["Equipos Networking", "Clientes", "Rectificadores","Plantas"]]
     reply_markup = ReplyKeyboardMarkup(keyboard, one_time_keyboard=True)
 
@@ -875,7 +875,8 @@ async def help(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
          f"¡Hola {user.first_name}. Aquí están los comandos que puedes usar:\n\n"
     "✨ **Comandos principales**:\n"
         "🔹 `/start` - Inicia la conversación desde el principio. ¡Empecemos desde cero! 🌟\n"
-        "🔹 `/menu` - Accede al menú principal de opciones para consultar información sobre tus hosts y mucho más. 🖥️\n"
+        "🔹 `/menu` - accede al menú principal con dos opciones, consultar problemas generales o consultar por tipo de equipos 🌟\n"
+        "🔹 `/device_group` - lista los grupos de dispositivos para consultar información sobre tus hosts y mucho más. 🖥️\n"
         "🔹 `/stop` - Detiene la conversación actual (no el bot completo). Si necesitas terminar, este es el comando. ❌\n"
         "🔹 `/help` - Muestra este mensaje con todos los comandos disponibles. ¡Aquí siempre puedes volver! ❓\n\n"
         "🚀 **¿Qué puedo hacer por ti?**\n"
@@ -908,7 +909,7 @@ async def handle_new_search1(update: Update, context: CallbackContext) -> int:
 
     if answer == "Sí":
         #await update.callback_query.answer()
-        return await main_menu(update, context)# Volver a llamar la función que busca problemas
+        return await menu(update, context)# Volver a llamar la función que busca problemas
         
 
     elif answer == "No":
@@ -923,7 +924,7 @@ async def handle_new_search1(update: Update, context: CallbackContext) -> int:
         return NEW_SEARCH1  # Mantener el estado actual para continuar
 
 # Función del menú principal
-async def main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+async def menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     selected_option = None  # La opción seleccionada por el usuario
     context.user_data['selected_option'] = selected_option
     keyboard = [["Consultar Incidentes (Accesos Rápidos)", "Consultar por tipo de equipo"]]
