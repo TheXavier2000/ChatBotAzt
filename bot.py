@@ -26,19 +26,86 @@ from  dep import create_table_image
 from  dep import create_table_image_incidents
 #from mainIris import set_bot_commands
 (
-    USERNAME, PASSWORD, CHOICE, NEW_SEARCH, HOST_TYPE, HOST_NAME, 
+    USERNAME, PASSWORD, CHOICE, NEW_SEARCH, HOST_TYPE, HOST_NAME, SESSION,
     SELECTED_HOST, GRAPH_CHOICE, GRAPH_CHOICE2, GRAPH_CHOICE3, GRAPH_CHOICE4,  EQUIPO1,
     LOCATION_NAME, SEARCH_TYPE, SHOW_PROBLEMS, SELECTED_LOCATION,SELECTING_DEPARTMENT,NEW_SEARCH1, PROBLEMAS1,PROCESS_SELECTION1
-) = range(20)
+) = range(21)
 
 from telegram import ForceReply, Update, BotCommand
 from telegram.ext import ContextTypes
 
-# Función de inicio
+
+# 1. Función para manejar la inactividad
+async def stop1(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Termina la conversación y elimina el temporizador de inactividad."""
+    # Eliminar el trabajo de inactividad si existe
+    job = context.user_data.get('inactivity_job')
+    if job:
+        job.schedule_removal()
+
+    # Mostrar mensaje de despedida
+    await update.message.reply_text("¡Hasta luego! 😎👋")
+
+    return ConversationHandler.END
+
+from telegram.ext import JobQueue
+
+# 1. Función para manejar la inactividad
+from telegram.ext import ConversationHandler
+
+async def start_inactivity_timer(update: Update, context: CallbackContext):
+    chat_id = update.message.chat_id
+    job_queue = context.application.job_queue  # Accede al job_queue de la aplicación
+    #job_queue.run_once(end_session, 60, data=chat_id)  # 60 segundos = 1 minuto
+    job_queue.run_once(end_session, 60, data={'chat_id': chat_id})  # Usamos un diccionario
+    #job_queue.run_once(end_session, 60, data={'chat_id': update.message.chat_id, 'update': update, 'context': context})
+    #return SESSION
+
+async def end_session(context: CallbackContext):
+    print(f"Contexto del trabajo: {context}")  # Imprime el contexto del trabajo
+
+    # Verificamos si el contexto del trabajo tiene datos
+    if context.job and context.job.data:
+        # Ahora context.job.data debería ser un diccionario
+        chat_id = context.job.data.get('chat_id')  # Obtenemos el chat_id del diccionario
+
+        if chat_id:
+            print(f"Cerrando sesión para chat_id: {chat_id}")
+            await context.bot.send_message(chat_id, text="La sesión ha terminado por inactividad.")
+            
+        else:
+            print("No se encontró el chat_id en los datos del trabajo.")
+    else:
+        print("No se encontraron datos del trabajo para procesar.")
+    
+    return ConversationHandler.END
+   # await call_stop()
+
+
+async def handle_new_search2(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    print("asdasdasd")
+    await update.message.reply_text("Gracias por usar el bot. La conversación ha finalizado.")
+    return ConversationHandler.END  # Termina la conversación
+    
+async def call_stop():
+    # Simula una actualización (update) y contexto (context)
+    class FakeUpdate:
+        def __init__(self):
+            self.message = type("Message", (object,), {"reply_text": print})
+    
+    # Llamamos a la función stop pasando un "FakeUpdate" para simular la llamada del bot
+    await stop(FakeUpdate(), None)
+
+
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     user = update.effective_user
     
-    # Respuesta inicial al usuario
+    # Reiniciar el temporizador de inactividad
+    #start_inactivity_timer(update, context)
+    # Asegúrate de usar await cuando llames a start_inactivity_timer
+    await start_inactivity_timer(update, context)
+
+
     await update.message.reply_text(
         f"¡Hola {user.first_name}! Soy 👁Iris👁 tu asistente para consultas de datos sobre hosts. 🖥️\n\n"
         "Conmigo, puedes:\n\n"

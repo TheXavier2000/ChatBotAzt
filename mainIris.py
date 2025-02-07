@@ -8,7 +8,7 @@ from bot import (
     start, handle_username, ask_interfaces, handle_interface_selection,
     handle_password, handle_graph_choice2, ask_choice, handle_choice, 
     handle_graph_choice, handle_selected_host, ask_new_search, handle_host_name, 
-    handle_new_search, ask_host_type, handle_host_type, stop, device_group, menu, list_incidents,help, handle_problemas1,handle_selected_equipo,
+    handle_new_search,handle_new_search2,end_session ,ask_host_type, handle_host_type, stop, device_group, menu, list_incidents,help, handle_problemas1,handle_selected_equipo,
 
     handle_search_type, ask_location_name,process_selection, location_search, show_selected_location,handle_department_selection,handle_new_search1
 )
@@ -19,18 +19,18 @@ from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 # Definir los estados de la conversación
 (
     USERNAME, PASSWORD, CHOICE, NEW_SEARCH, HOST_TYPE, HOST_NAME, 
-    SELECTED_HOST, GRAPH_CHOICE, GRAPH_CHOICE2, GRAPH_CHOICE3, GRAPH_CHOICE4,  EQUIPO1,
+    SELECTED_HOST, GRAPH_CHOICE, GRAPH_CHOICE2, GRAPH_CHOICE3, GRAPH_CHOICE4,  EQUIPO1,SESSION,
 
     LOCATION_NAME, SEARCH_TYPE, SHOW_PROBLEMS, SELECTED_LOCATION,SELECTING_DEPARTMENT,NEW_SEARCH1, PROBLEMAS1,PROCESS_SELECTION1
-) = range(20)
+) = range(21)
 
 
 
 
 
 def main():
-    #application = Application.builder().token('7319075472:AAGHNFfervCfH3lt5mblsMoDgjtNQwydlwo').build()#pruebas 
-    application = Application.builder().token('7254640619:AAE_r6W7ajo5nb4lHLZWBLpT8h2MmQqHkMc').build() #principal
+    application = Application.builder().token('7319075472:AAGHNFfervCfH3lt5mblsMoDgjtNQwydlwo').build()#pruebas 
+    #application = Application.builder().token('7254640619:AAE_r6W7ajo5nb4lHLZWBLpT8h2MmQqHkMc').build() #principal
     
 
 
@@ -76,6 +76,9 @@ def main():
             ],
             PROBLEMAS1: [MessageHandler(filters.TEXT & ~filters.COMMAND, handle_problemas1)],  
             PROCESS_SELECTION1: [MessageHandler(filters.TEXT & ~filters.COMMAND, process_selection)],  
+            #NEW_SEARCH2: [MessageHandler(filters.TEXT & ~filters.COMMAND, handle_new_search2)],
+           # SESSION: MessageHandler(Filters.text & ~Filters.command, message_received),
+
           
         },
         fallbacks=[
@@ -83,7 +86,8 @@ def main():
             CommandHandler('device_group', device_group),
             CommandHandler('menu', menu),
         #    CommandHandler('list_incidents', list_incidents),
-            CommandHandler('help', help)
+            CommandHandler('help', help),
+            CommandHandler('end', end_session)
         ],
     )
 
