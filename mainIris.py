@@ -8,7 +8,7 @@ from bot import (
     start, handle_username, ask_interfaces, handle_interface_selection,
     handle_password, handle_graph_choice2, ask_choice, handle_choice, 
     handle_graph_choice, handle_selected_host, ask_new_search, handle_host_name, 
-    handle_new_search,handle_new_search2,end_session ,ask_host_type, handle_host_type, stop, device_group, menu, list_incidents,help, handle_problemas1,handle_selected_equipo,
+    handle_new_search ,ask_host_type, handle_host_type, stop, device_group, menu, list_incidents,help, handle_problemas1,handle_selected_equipo,
 
     handle_search_type, ask_location_name,process_selection, location_search, show_selected_location,handle_department_selection,handle_new_search1
 )
@@ -87,7 +87,7 @@ def main():
             CommandHandler('menu', menu),
         #    CommandHandler('list_incidents', list_incidents),
             CommandHandler('help', help),
-            CommandHandler('end', end_session)
+            #CommandHandler('end', end_session)
         ],
     )
 

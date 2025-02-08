@@ -35,76 +35,63 @@ from telegram import ForceReply, Update, BotCommand
 from telegram.ext import ContextTypes
 
 
-# 1. Función para manejar la inactividad
-async def stop1(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Termina la conversación y elimina el temporizador de inactividad."""
-    # Eliminar el trabajo de inactividad si existe
-    job = context.user_data.get('inactivity_job')
-    if job:
-        job.schedule_removal()
+from telegram.ext import ContextTypes, CallbackContext, ConversationHandler, JobQueue
+from telegram import Update, ForceReply
+import re
 
-    # Mostrar mensaje de despedida
-    await update.message.reply_text("¡Hasta luego! 😎👋")
+from datetime import datetime, timedelta
 
-    return ConversationHandler.END
 
-from telegram.ext import JobQueue
-
-# 1. Función para manejar la inactividad
+import asyncio
 from telegram.ext import ConversationHandler
 
-async def start_inactivity_timer(update: Update, context: CallbackContext):
-    chat_id = update.message.chat_id
-    job_queue = context.application.job_queue  # Accede al job_queue de la aplicación
-    #job_queue.run_once(end_session, 60, data=chat_id)  # 60 segundos = 1 minuto
-    job_queue.run_once(end_session, 60, data={'chat_id': chat_id})  # Usamos un diccionario
-    #job_queue.run_once(end_session, 60, data={'chat_id': update.message.chat_id, 'update': update, 'context': context})
-    #return SESSION
+# Diccionario para almacenar los tiempos de inactividad
+inactivity_timers = {}
 
-async def end_session(context: CallbackContext):
-    print(f"Contexto del trabajo: {context}")  # Imprime el contexto del trabajo
+# Tiempo máximo de inactividad en segundos 
+MAX_INACTIVITY_TIME = 20
 
-    # Verificamos si el contexto del trabajo tiene datos
-    if context.job and context.job.data:
-        # Ahora context.job.data debería ser un diccionario
-        chat_id = context.job.data.get('chat_id')  # Obtenemos el chat_id del diccionario
+async def reset_inactivity_timer(user_id: int, update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Reinicia el temporizador de inactividad para un usuario específico."""
+    if user_id in inactivity_timers:
+        inactivity_timers[user_id].cancel()  # Cancela el temporizador anterior
 
-        if chat_id:
-            print(f"Cerrando sesión para chat_id: {chat_id}")
-            await context.bot.send_message(chat_id, text="La sesión ha terminado por inactividad.")
-            
-        else:
-            print("No se encontró el chat_id en los datos del trabajo.")
-    else:
-        print("No se encontraron datos del trabajo para procesar.")
+    # Establece un nuevo temporizador
+    inactivity_timers[user_id] = asyncio.create_task(inactivity_timeout(user_id, update, context))
+
+async def inactivity_timeout(user_id: int, update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Termina la conversación si no hay actividad durante el tiempo configurado."""
+    await asyncio.sleep(MAX_INACTIVITY_TIME)  # Espera el tiempo máximo de inactividad
     
-    return ConversationHandler.END
-   # await call_stop()
+    # Si llega aquí, el usuario no ha interactuado, así que finalizamos la conversación
+    await end_inactivity_conversation(update, context)
+
+async def end_inactivity_conversation(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Envía un mensaje de inactividad y termina la conversación."""
+    user = update.effective_user  # El usuario que está enviando el mensaje
+
+    # Envía el mensaje de inactividad
+    await update.message.reply_text("⏳ La conversación ha terminado por inactividad.")
+
+    # Finalizamos el temporizador de inactividad cancelando cualquier tarea pendiente
+    if user.id in inactivity_timers:
+        #inactivity_timers[user.id].cancel()
+        del inactivity_timers[user.id]  # Eliminar el temporizador del diccionario
+
+    # Llamamos a la función stop para finalizar la conversación
+     
+    context.application.stop()  # Detiene el bot por completo
+    return await stop(update, context)
+   
+
+    
 
 
-async def handle_new_search2(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    print("asdasdasd")
-    await update.message.reply_text("Gracias por usar el bot. La conversación ha finalizado.")
-    return ConversationHandler.END  # Termina la conversación
-    
-async def call_stop():
-    # Simula una actualización (update) y contexto (context)
-    class FakeUpdate:
-        def __init__(self):
-            self.message = type("Message", (object,), {"reply_text": print})
-    
-    # Llamamos a la función stop pasando un "FakeUpdate" para simular la llamada del bot
-    await stop(FakeUpdate(), None)
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     user = update.effective_user
-    
-    # Reiniciar el temporizador de inactividad
-    #start_inactivity_timer(update, context)
-    # Asegúrate de usar await cuando llames a start_inactivity_timer
-    await start_inactivity_timer(update, context)
-
+    await reset_inactivity_timer(user.id, update, context)  # Reinicia el temporizador de inactividad
 
     await update.message.reply_text(
         f"¡Hola {user.first_name}! Soy 👁Iris👁 tu asistente para consultas de datos sobre hosts. 🖥️\n\n"
@@ -124,17 +111,24 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
 
     return USERNAME
 
-
+# En tus otros manejadores de mensajes, recuerda agregar la llamada a `reset_inactivity_timer` para cada mensaje.
 async def handle_username(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    user = update.effective_user
+    await reset_inactivity_timer(user.id, update, context)  # Reinicia el temporizador de inactividad
+
     username = update.message.text
     context.user_data['username'] = username  # Guardar el nombre de usuario
 
-    await update.message.reply_text("Por favor ingresa tu contraseña en zabbix.",reply_markup=ForceReply(selective=True))
+    await update.message.reply_text("Por favor ingresa tu contraseña en zabbix.", reply_markup=ForceReply(selective=True))
     
     # Mostrar solo los comandos /start y /stop
     await set_bot_commands(context.application, start_menu=True)
     
     return PASSWORD
+
+# Repite lo mismo en cada uno de los demás manejadores (handle_password, ask_host_type, etc.)
+
+
 
 # 1. Función de autenticación exitosa
 async def handle_password(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
