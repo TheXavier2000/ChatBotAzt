@@ -18,13 +18,14 @@ from telegram.ext import CallbackContext
 from telegram import ForceReply
 import json
 from  dep import get_gigabit_problems
+from  dep import  consultar_zabbix
 from  dep import  process_events
 from  dep import  get_event_details 
 from  dep import convert_to_colombia_time
 from  dep import calculate_duration
 from  dep import create_table_image
 from  dep import create_table_image_incidents
-#from mainIris import set_bot_commands
+#from mainIris import set_bot_command
 (
     USERNAME, PASSWORD, CHOICE, NEW_SEARCH, HOST_TYPE, HOST_NAME, 
     SELECTED_HOST, GRAPH_CHOICE, GRAPH_CHOICE2, GRAPH_CHOICE3, GRAPH_CHOICE4,  EQUIPO1,
@@ -325,6 +326,52 @@ async def problemas(update: Update, context: CallbackContext):
             return NEW_SEARCH
     else:
         await update.message.reply_text("No se pudo autenticar correctamente.")
+
+async def ATP(update: Update, context: CallbackContext):
+    await set_bot_commands(context.application, start_menu=False)
+    host_type = context.user_data.get('host_type')  # Recuperar el tipo de host
+    auth_token = context.user_data.get('auth_token')
+    tipo_problema = context.user_data.get('tipo_problema')
+    tipo= tipo_problema
+    if tipo_problema == "Descarga batería" or tipo_problema == "Voltaje batería" or tipo_problema =="Temperatura rectificador" or tipo_problema =="Temperatura bateria":
+        severity=2
+    elif tipo_problema == "Puerta abierta":
+        severity=4   
+    else:     
+         severity=4   
+
+    if auth_token:
+        problems = consultar_zabbix(auth_token,host_type,tipo,severity)
+       
+        if problems:
+            department_msg, reply_markup, department_count = process_events(auth_token, problems)
+            #await update.message.reply_text(department_msg, reply_markup=reply_markup)
+            if update.message:
+             # Si es un mensaje, acceder a update.message.text
+             await update.message.reply_text(department_msg, reply_markup=reply_markup)
+            elif update.callback_query:
+              # Si es un CallbackQuery, acceder a update.callback_query.message
+             await update.callback_query.message.reply_text(department_msg, reply_markup=reply_markup)
+               # Responder al CallbackQuery para evitar que quede pendiente
+             await update.callback_query.answer()
+            
+            # Guardamos los datos en context.user_data
+            context.user_data['department_count'] = department_count
+            context.user_data['auth_token'] = auth_token
+            context.user_data['problems'] = problems  # Guardamos los problemas obtenidos
+            return SELECTING_DEPARTMENT
+            #return DEPARTAMENTO
+            #return await handle_department_selection(update, context)
+           # await ask_new_search(update, context)
+            #return NEW_SEARCH  
+        
+        else:
+            await update.message.reply_text("No se encontraron problemas.")
+            await ask_new_search(update, context)  # Preguntar si quiere hacer una nueva búsqueda
+            return NEW_SEARCH
+    else:
+        await update.message.reply_text("No se pudo autenticar correctamente.")
+        
 
      
 async def handle_department_selection(update: Update, context: CallbackContext):
@@ -1011,7 +1058,7 @@ async def list_incidents(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     await set_bot_commands(context.application, start_menu=False)
     
     # Crear el teclado de opciones
-    keyboard = [["Nodos caídos", "Nodos en descarga", "Puertas Abiertas"]]
+    keyboard = [["Nodos caídos", "Nodos en descarga", "Puertas Abiertas","ATP"]]
     reply_markup = ReplyKeyboardMarkup(keyboard, one_time_keyboard=True)
     
     # Enviar mensaje con las opciones
@@ -1051,6 +1098,14 @@ async def process_selection(update: Update, context: ContextTypes.DEFAULT_TYPE):
          auth_token = context.user_data.get('auth_token')
          await update.message.reply_text("Buscando problemas, por favor espere...")
          return await problemas(update, context)
+    elif selected_option == "ATP":
+         host_type = "Rectificadores"
+         context.user_data['host_type'] = host_type
+         tipo_problema ="Voltaje batería"
+         context.user_data['tipo_problema'] = tipo_problema 
+         auth_token = context.user_data.get('auth_token')
+         await update.message.reply_text("Buscando problemas, por favor espere...")
+         return await ATP(update, context)
 
     elif selected_option == "Top 10 Saturación de Agregadores en los últimos 10 minutos":
         # Lógica para "Top 10 Saturación"

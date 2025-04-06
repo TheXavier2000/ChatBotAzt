@@ -13,6 +13,75 @@ import pytz
 
 ZABBIX_URL = "http://10.144.2.194/zabbix/api_jsonrpc.php"
 
+ 
+def consultar_zabbix(auth_token,host_type,tipo,severity):
+    names = ["voltaje", "Puerta abierta", "Planta Encendida"]
+    # Diccionario para almacenar resultados por nombre
+    results_by_name = {
+        "voltaje": [],
+        "Puerta abierta": [],
+        "Planta Encendida": []
+    }
+
+    for name in names:
+        data = {
+            "jsonrpc": "2.0",
+            "method": "problem.get",
+            "params": {
+                "output": "extend",
+                "groupids": [53, 76],  # Grupos con ID 53 y 75
+                "selectAcknowledges": "extend",
+                "selectTags": "extend",
+                "selectSuppressionData": "extend",
+                "search": {
+                    "name": name
+                },
+                "recent": True,
+                "sortorder": "DESC"
+            },
+            "auth": auth_token,  # Token de autenticación
+            "id": 1
+        }
+
+        # Realizar la solicitud POST
+        response = requests.post(ZABBIX_URL , json=data)
+
+        # Verificar el estado de la respuesta
+        if response.status_code == 200:
+            # Convertir la respuesta JSON en un objeto de Python
+            result = response.json()
+
+            # Comprobar si la respuesta tiene resultados
+            if "result" in result:
+                # Filtrar los resultados por el tag específico
+                filtered_results = []
+                for event in result["result"]:
+                    # Verificar si el evento tiene el tag "Propietario" con valor "ATP"
+                    tags = event.get("tags", [])
+                    for tag in tags:
+                        if tag.get("tag") == "Propietario" and tag.get("value") == "ATP":
+                            filtered_results.append(event)
+                            break  # Ya encontramos el tag, no es necesario seguir buscando
+
+                # Almacenar los resultados filtrados en el diccionario
+                if filtered_results:
+                    results_by_name[name] = filtered_results
+
+            else:
+                # Si no hay resultados para un nombre específico, lo dejamos vacío
+                results_by_name[name] = []
+
+        else:
+            # Si hubo un error en la solicitud
+            return f"Error en la solicitud: {response.status_code}"
+
+    # Combinar los resultados de las tres consultas en el orden deseado
+    all_results = results_by_name["voltaje"] + results_by_name["Puerta abierta"] + results_by_name["Planta Encendida"]
+
+    # Retornar los resultados combinados
+    return all_results
+
+
 # Función para consultar problemas
 def get_gigabit_problems(auth_token,host_type,tipo,severity):
     if host_type=="Equipos Networking":
@@ -38,9 +107,9 @@ def get_gigabit_problems(auth_token,host_type,tipo,severity):
             "selectAcknowledges": "extend",
             "selectTags": "extend",
             "search": {
-                "name": tipo
+                "name":tipo
             },
-            "severities": severity,
+           "severities": severity,
             "recent": True,
             "sortfield": ["eventid"],
             "sortorder": "DESC"
@@ -185,16 +254,24 @@ def create_table_image(results, selected_option):
     # Definir las columnas de la tabla según la opción seleccionada
     if selected_option == "Nodos caídos":
         columns = ["Hora de inicio", "Host", "Problema", "Duración", "Departamento", "Municipio", "Tk", "Equipo"]
-    elif selected_option == "Nodos en descarga":
+    elif selected_option == "Nodos en descarga" or selected_option == "ATP":
         columns = ["Hora de inicio", "Host", "Problema", "Operational Data", "Duración", "Departamento", "Municipio", "Tk"]
     else:
         columns = ["Hora de inicio", "Host", "Problema", "Duración", "Departamento", "Municipio", "Tk"]
 
     # Crear los datos para la tabla
-    if selected_option == "Nodos en descarga":
+    if selected_option == "Nodos en descarga" or selected_option == "ATP":
         rows = [list(row) for row in results]
     else:
         rows = [row[:3] + row[4:] for row in results]
+
+    # Ordenar por problema, primero "Voltaje de Batería", luego "Puerta Abierta" y finalmente "Planta Encendida"
+    if selected_option == "ATP":
+        # Definir la prioridad para el orden de los problemas
+        problem_priority = {"Voltaje Batería": 3, "Puerta abierta": 2, "Planta Encendida": 1}
+        
+        # Función de comparación para ordenar por problema
+        rows.sort(key=lambda x: (problem_priority.get(x[2], 4), x[0]), reverse=True)  # x[2] es el 'Problema' y x[0] es la 'Hora de inicio'
 
     # Si la opción seleccionada es "Nodos caídos", agregar la columna "Equipo"
     if selected_option == "Nodos caídos":
@@ -242,7 +319,6 @@ def create_table_image(results, selected_option):
 
     plt.close(fig)
     return img_buf
-
 
 
 # Función para generar una tabla con matplotlib y devolverla como imagen
